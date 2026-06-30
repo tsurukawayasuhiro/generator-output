@@ -155,29 +155,31 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
           </div>
         </div>
 
-        {/* ════ 右エリア ════ */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "14px 14px 0", gap: 7, minWidth: 0 }}>
+        {/* ════ 右エリア: position:relative + 子を全てtop/height固定で配置 ════ */}
+        {/* 高さ540px確定。各セクションのtop/heightを明示してこだわりの縦伸びを防ぐ */}
+        {/* ①価値 top=12 h=76 / ②代表案件 top=96 h=324 / ③こだわり top=428 h=84 / footer top=520 h=16 */}
+        <div style={{ flex: 1, position: "relative", height: H, overflow: "hidden" }}>
 
-          {/* ① 価値の出し方（横3枚） */}
-          <div>
+          {/* ① 価値の出し方 top=12, height=76 */}
+          <div style={{ position: "absolute", top: 12, left: 14, right: 14, height: 76, overflow: "hidden" }}>
             <Label text="価値の出し方" color={C.blue} />
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, height: 57 }}>
               {[0,1,2].map((i) => (
                 <div key={i} style={{
                   flex: 1, background: C.bluePale, border: `1px solid ${C.blueBorder}`,
-                  borderRadius: 5, padding: "6px 8px", display: "flex", alignItems: "flex-start", gap: 5,
+                  borderRadius: 5, padding: "5px 8px", display: "flex", alignItems: "flex-start", gap: 5, overflow: "hidden",
                 }}>
                   <CircleBadge n={i+1} color={C.blue} />
-                  <div style={{ fontSize: 9.5, color: C.navy, lineHeight: 1.5 }}>{values[i] ?? "—"}</div>
+                  <div style={{ fontSize: 9.5, color: C.navy, lineHeight: 1.45 }}>{values[i] ?? "—"}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* ② 代表案件（縦並び） */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+          {/* ② 代表案件 top=96, height=324 */}
+          <div style={{ position: "absolute", top: 96, left: 14, right: 14, height: 324, overflow: "hidden", display: "flex", flexDirection: "column" }}>
             <Label text="代表案件" color={C.slate} />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, minHeight: 0 }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, overflow: "hidden" }}>
               {projs.length === 0 && (
                 <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 5, padding: "8px 10px", fontSize: 9, color: C.muted }}>—</div>
               )}
@@ -185,32 +187,24 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
                 <div key={i} style={{
                   flex: 1, background: C.white, border: `1px solid ${C.border}`,
                   borderRadius: 5, padding: "8px 12px",
-                  display: "flex", gap: 12, overflow: "hidden", minHeight: 0,
+                  display: "flex", gap: 12, overflow: "hidden",
                 }}>
-                  {/* 左：番号バッジ */}
                   <div style={{ flexShrink: 0, paddingTop: 1 }}>
                     <span style={{
                       fontSize: 7.5, fontWeight: 700, padding: "2px 7px", borderRadius: 3,
                       background: C.bluePale, color: C.blue, border: `1px solid ${C.blueBorder}`,
                     }}>案件 {i+1}</span>
                   </div>
-
-                  {/* 中央：概要・役割・成果・その他 */}
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-                    <div style={{ fontSize: 10.5, color: C.navy, lineHeight: 1.65, fontWeight: 500 }}>
-                      {p.overview}
-                    </div>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, minWidth: 0, overflow: "hidden" }}>
+                    <div style={{ fontSize: 10.5, color: C.navy, lineHeight: 1.6, fontWeight: 500 }}>{p.overview}</div>
                     {p.role && (
                       <div style={{ fontSize: 8.5, color: C.slate }}>
                         <span style={{ fontWeight: 700, color: C.muted, marginRight: 4 }}>役割</span>{p.role}
                       </div>
                     )}
                     {(p.period || p.scale) && (
-                      <div style={{ fontSize: 8.5, color: C.muted }}>
-                        {[p.period, p.scale].filter(Boolean).join("　")}
-                      </div>
+                      <div style={{ fontSize: 8.5, color: C.muted }}>{[p.period, p.scale].filter(Boolean).join("　")}</div>
                     )}
-                    {/* generator が出力する追加フィールドを全て表示 */}
                     {p.extra.map(({ label, value }) => (
                       <div key={label} style={{ fontSize: 8.5, color: C.slate }}>
                         <span style={{ fontWeight: 700, color: C.muted, marginRight: 4 }}>{label}</span>{value}
@@ -220,17 +214,14 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
                       <div style={{
                         display: "inline-flex", alignItems: "center", gap: 4,
                         background: C.greenPale, border: `1px solid ${C.greenBorder}`,
-                        borderRadius: 4, padding: "2px 8px",
-                        fontSize: 8.5, color: C.green,
+                        borderRadius: 4, padding: "2px 8px", fontSize: 8.5, color: C.green, flexShrink: 0,
                       }}>
                         <span style={{ fontWeight: 700 }}>成果</span>{p.result}
                       </div>
                     )}
                   </div>
-
-                  {/* 右：技術スタックタグ */}
                   {p.stack && (
-                    <div style={{ flexShrink: 0, width: 200 }}>
+                    <div style={{ flexShrink: 0, width: 200, overflow: "hidden" }}>
                       <div style={{ fontSize: 7.5, fontWeight: 700, color: C.muted, marginBottom: 4 }}>技術スタック</div>
                       <StackTags stack={p.stack} />
                     </div>
@@ -240,35 +231,35 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
             </div>
           </div>
 
-          {/* ③ こだわり（横3枚） */}
-          <div>
+          {/* ③ こだわり top=428, height=84 */}
+          <div style={{ position: "absolute", top: 428, left: 14, right: 14, height: 84, overflow: "hidden" }}>
             <Label text="こだわり" color={C.orange} />
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, height: 65 }}>
               {[0,1,2].map((i) => (
                 <div key={i} style={{
                   flex: 1, background: C.orangePale, border: `1px solid ${C.orangeBorder}`,
-                  borderRadius: 5, padding: "6px 8px", display: "flex", alignItems: "flex-start", gap: 5,
+                  borderRadius: 5, padding: "5px 8px", display: "flex", alignItems: "flex-start", gap: 5, overflow: "hidden",
                 }}>
                   <CircleBadge n={i+1} color={C.orange} />
-                  <div style={{ fontSize: 9.5, color: C.navy, lineHeight: 1.5 }}>{kodawari[i] ?? "—"}</div>
+                  <div style={{ fontSize: 9.5, color: C.navy, lineHeight: 1.45 }}>{kodawari[i] ?? "—"}</div>
                 </div>
               ))}
               {atwValue && (
                 <div style={{
                   flex: 1, background: "#EDE9FE", border: "1px solid #C4B5FD",
-                  borderRadius: 5, padding: "6px 8px",
+                  borderRadius: 5, padding: "5px 8px", overflow: "hidden",
                 }}>
-                  <div style={{ fontSize: 6.5, fontWeight: 700, color: "#6D28D9",
-                    textTransform: "uppercase" as const, marginBottom: 3 }}>ATW提供価値</div>
-                  <div style={{ fontSize: 9, color: "#5B21B6", lineHeight: 1.55 }}>{atwValue}</div>
+                  <div style={{ fontSize: 6.5, fontWeight: 700, color: "#6D28D9", textTransform: "uppercase" as const, marginBottom: 3 }}>ATW提供価値</div>
+                  <div style={{ fontSize: 9, color: "#5B21B6", lineHeight: 1.45 }}>{atwValue}</div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* フッター */}
+          {/* フッター top=520, height=16 */}
           <div style={{
-            borderTop: `1px solid ${C.border}`, padding: "4px 0", flexShrink: 0,
+            position: "absolute", top: 520, left: 14, right: 14, height: 16,
+            borderTop: `1px solid ${C.border}`, paddingTop: 3,
             display: "flex", justifyContent: "space-between",
           }}>
             <span style={{ fontSize: 7, color: C.muted }}>Engineer Profile  |  Confidential</span>
