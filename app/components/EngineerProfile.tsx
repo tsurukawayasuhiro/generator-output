@@ -156,7 +156,15 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
         </div>
 
         {/* ════ 右エリア ════ */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "14px 14px 0", gap: 7, minWidth: 0 }}>
+        <div style={{
+          flex: 1, minWidth: 0,
+          display: "grid",
+          gridTemplateRows: "auto 1fr auto auto",
+          padding: "12px 14px 0",
+          gap: 7,
+          height: H,
+          overflow: "hidden",
+        }}>
 
           {/* ① 価値の出し方（横3枚） */}
           <div>
@@ -175,9 +183,9 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
           </div>
 
           {/* ② 代表案件（縦並び） */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <Label text="代表案件" color={C.slate} />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, minHeight: 0 }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, overflow: "hidden" }}>
               {projs.length === 0 && (
                 <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 5, padding: "8px 10px", fontSize: 9, color: C.muted }}>—</div>
               )}
