@@ -156,36 +156,41 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
         </div>
 
         {/* ════ 右エリア ════ */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "14px 14px 0", gap: 7, minWidth: 0 }}>
+        <div style={{
+          flex: 1, display: "flex", flexDirection: "column",
+          padding: "12px 14px 8px", gap: 6, minWidth: 0,
+          height: H, overflow: "hidden",
+        }}>
 
-          {/* ① 価値の出し方（横3枚） */}
-          <div>
+          {/* ① 価値の出し方（横3枚）固定高さ */}
+          <div style={{ flexShrink: 0 }}>
             <Label text="価値の出し方" color={C.blue} />
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, height: 62 }}>
               {[0,1,2].map((i) => (
                 <div key={i} style={{
                   flex: 1, background: C.bluePale, border: `1px solid ${C.blueBorder}`,
                   borderRadius: 5, padding: "6px 8px", display: "flex", alignItems: "flex-start", gap: 5,
+                  overflow: "hidden",
                 }}>
                   <CircleBadge n={i+1} color={C.blue} />
-                  <div style={{ fontSize: 9.5, color: C.navy, lineHeight: 1.5 }}>{values[i] ?? "—"}</div>
+                  <div style={{ fontSize: 9.5, color: C.navy, lineHeight: 1.45, overflow: "hidden" }}>{values[i] ?? "—"}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* ② 代表案件（縦並び） */}
+          {/* ② 代表案件（縦並び・残り高さを占有） */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
             <Label text="代表案件" color={C.slate} />
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6, minHeight: 0 }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5, minHeight: 0, overflow: "hidden" }}>
               {projs.length === 0 && (
                 <div style={{ background: C.white, border: `1px solid ${C.border}`, borderRadius: 5, padding: "8px 10px", fontSize: 9, color: C.muted }}>—</div>
               )}
               {projs.slice(0, 3).map((p, i) => (
                 <div key={i} style={{
                   flex: 1, background: C.white, border: `1px solid ${C.border}`,
-                  borderRadius: 5, padding: "8px 12px",
-                  display: "flex", gap: 12, overflow: "hidden", minHeight: 0,
+                  borderRadius: 5, padding: "7px 10px",
+                  display: "flex", gap: 10, overflow: "hidden", minHeight: 0,
                 }}>
                   {/* 左：番号バッジ */}
                   <div style={{ flexShrink: 0, paddingTop: 1 }}>
@@ -196,23 +201,22 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
                   </div>
 
                   {/* 中央：概要・役割・成果・その他 */}
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, minWidth: 0 }}>
-                    <div style={{ fontSize: 10.5, color: C.navy, lineHeight: 1.65, fontWeight: 500 }}>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2, minWidth: 0, overflow: "hidden" }}>
+                    <div style={{ fontSize: 10, color: C.navy, lineHeight: 1.55, fontWeight: 600 }}>
                       {p.overview}
                     </div>
                     {p.role && (
-                      <div style={{ fontSize: 8.5, color: C.slate }}>
+                      <div style={{ fontSize: 8, color: C.slate }}>
                         <span style={{ fontWeight: 700, color: C.muted, marginRight: 4 }}>役割</span>{p.role}
                       </div>
                     )}
                     {(p.period || p.scale) && (
-                      <div style={{ fontSize: 8.5, color: C.muted }}>
+                      <div style={{ fontSize: 8, color: C.muted }}>
                         {[p.period, p.scale].filter(Boolean).join("　")}
                       </div>
                     )}
-                    {/* generator が出力する追加フィールドを全て表示 */}
                     {p.extra.map(({ label, value }) => (
-                      <div key={label} style={{ fontSize: 8.5, color: C.slate }}>
+                      <div key={label} style={{ fontSize: 8, color: C.slate }}>
                         <span style={{ fontWeight: 700, color: C.muted, marginRight: 4 }}>{label}</span>{value}
                       </div>
                     ))}
@@ -220,8 +224,8 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
                       <div style={{
                         display: "inline-flex", alignItems: "center", gap: 4,
                         background: C.greenPale, border: `1px solid ${C.greenBorder}`,
-                        borderRadius: 4, padding: "2px 8px",
-                        fontSize: 8.5, color: C.green,
+                        borderRadius: 4, padding: "2px 8px", marginTop: 2,
+                        fontSize: 8, color: C.green, flexShrink: 0,
                       }}>
                         <span style={{ fontWeight: 700 }}>成果</span>{p.result}
                       </div>
@@ -230,8 +234,8 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
 
                   {/* 右：技術スタックタグ */}
                   {p.stack && (
-                    <div style={{ flexShrink: 0, width: 200 }}>
-                      <div style={{ fontSize: 7.5, fontWeight: 700, color: C.muted, marginBottom: 4 }}>技術スタック</div>
+                    <div style={{ flexShrink: 0, width: 190, overflow: "hidden" }}>
+                      <div style={{ fontSize: 7, fontWeight: 700, color: C.muted, marginBottom: 3 }}>技術スタック</div>
                       <StackTags stack={p.stack} />
                     </div>
                   )}
@@ -240,27 +244,28 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
             </div>
           </div>
 
-          {/* ③ こだわり（横3枚） */}
-          <div>
+          {/* ③ こだわり（横3枚・固定高さ） */}
+          <div style={{ flexShrink: 0 }}>
             <Label text="こだわり" color={C.orange} />
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, height: 62 }}>
               {[0,1,2].map((i) => (
                 <div key={i} style={{
                   flex: 1, background: C.orangePale, border: `1px solid ${C.orangeBorder}`,
                   borderRadius: 5, padding: "6px 8px", display: "flex", alignItems: "flex-start", gap: 5,
+                  overflow: "hidden",
                 }}>
                   <CircleBadge n={i+1} color={C.orange} />
-                  <div style={{ fontSize: 9.5, color: C.navy, lineHeight: 1.5 }}>{kodawari[i] ?? "—"}</div>
+                  <div style={{ fontSize: 9.5, color: C.navy, lineHeight: 1.45, overflow: "hidden" }}>{kodawari[i] ?? "—"}</div>
                 </div>
               ))}
               {atwValue && (
                 <div style={{
                   flex: 1, background: "#EDE9FE", border: "1px solid #C4B5FD",
-                  borderRadius: 5, padding: "6px 8px",
+                  borderRadius: 5, padding: "6px 8px", overflow: "hidden",
                 }}>
                   <div style={{ fontSize: 6.5, fontWeight: 700, color: "#6D28D9",
                     textTransform: "uppercase" as const, marginBottom: 3 }}>ATW提供価値</div>
-                  <div style={{ fontSize: 9, color: "#5B21B6", lineHeight: 1.55 }}>{atwValue}</div>
+                  <div style={{ fontSize: 9, color: "#5B21B6", lineHeight: 1.45 }}>{atwValue}</div>
                 </div>
               )}
             </div>
@@ -268,7 +273,7 @@ const EngineerProfile = forwardRef<HTMLDivElement, Props>(function EngineerProfi
 
           {/* フッター */}
           <div style={{
-            borderTop: `1px solid ${C.border}`, padding: "4px 0", flexShrink: 0,
+            borderTop: `1px solid ${C.border}`, paddingTop: 4, flexShrink: 0,
             display: "flex", justifyContent: "space-between",
           }}>
             <span style={{ fontSize: 7, color: C.muted }}>Engineer Profile  |  Confidential</span>
