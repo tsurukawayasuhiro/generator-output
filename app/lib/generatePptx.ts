@@ -97,8 +97,9 @@ export function generatePptx(data: EngineerData): void {
   // 要約
   const summary = data["__summary"] ?? "";
   if (summary) {
-    slide.addText(summary, {
-      x:0.22, y:1.88, w:LW-0.3, h:0.9,
+    const sumH = 0.9;
+    slide.addText(fitText(summary, LW-0.34, sumH, 11, 1.4), {
+      x:0.22, y:1.88, w:LW-0.3, h:sumH,
       fontSize:11, color:"CCDDE8", fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.4,
     });
   }
@@ -113,12 +114,14 @@ export function generatePptx(data: EngineerData): void {
   const fieldStart = summary ? 2.9 : 1.92;
   const fieldEnd   = SH - 0.44;
   const slotH      = leftFields.length > 0 ? (fieldEnd - fieldStart) / leftFields.length : 1.2;
+  // valH: スロット内でラベル(0.24)+上余白(0.04)+テキスト+下余白(0.24)を確保
+  // slotH - 0.52 にすることで次ラベルまで確実に0.24in空く
   leftFields.forEach(([label, val], fi) => {
     const fy   = fieldStart + fi * slotH;
-    const valH = slotH - 0.3;
+    const valH = Math.max(0.3, slotH - 0.52);
     slide.addText(label, { x:0.22, y:fy,       w:LW-0.3, h:0.24, fontSize:9, bold:true, color:"7AAED4", charSpacing:1.5 });
     slide.addText(fitText(val, LW-0.34, valH, 10, 1.3), {
-      x:0.22, y:fy+0.26, w:LW-0.3, h:valH, fontSize:10, color:"D4E8F8", fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3,
+      x:0.22, y:fy+0.28, w:LW-0.3, h:valH, fontSize:10, color:"D4E8F8", fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3,
     });
   });
 
