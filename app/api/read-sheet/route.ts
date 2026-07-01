@@ -1,16 +1,18 @@
 import { google } from "googleapis";
 import { NextRequest } from "next/server";
 
-function getAuth() {
+// 認証インスタンスはモジュールスコープで1度だけ生成（毎リクエストで復号しない）
+const auth = (() => {
   const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_B64;
   if (!b64) throw new Error("GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_B64 is not set");
-  const json = Buffer.from(b64, "base64").toString("utf-8");
-  const credentials = JSON.parse(json);
+  const credentials = JSON.parse(Buffer.from(b64, "base64").toString("utf-8"));
   return new google.auth.GoogleAuth({
     credentials,
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
-}
+})();
+
+const SPREADSHEET_ID_RE = /^[a-zA-Z0-9_-]{20,60}$/;
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,14 +22,12 @@ export async function POST(request: NextRequest) {
       sheetName?: string;
     };
 
-    if (!spreadsheetId) {
-      return Response.json({ error: "spreadsheetId is required" }, { status: 400 });
+    if (!spreadsheetId || !SPREADSHEET_ID_RE.test(spreadsheetId)) {
+      return Response.json({ error: "Invalid spreadsheet ID" }, { status: 400 });
     }
 
-    const auth = getAuth();
     const sheets = google.sheets({ version: "v4", auth });
 
-    // Get all sheet names
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const sheetNames =
       meta.data.sheets?.map((s) => s.properties?.title ?? "").filter(Boolean) ?? [];
@@ -36,12 +36,15 @@ export async function POST(request: NextRequest) {
       return Response.json({ sheetNames, data: {} });
     }
 
-    // Read A:B columns of the specified sheet
+    // sheetName を取得済み一覧で検証（レンジインジェクション防止）
+    if (!sheetNames.includes(sheetName)) {
+      return Response.json({ error: "Invalid sheet name" }, { status: 400 });
+    }
+
     const range = `'${sheetName}'!A:B`;
     const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
     const rows = res.data.values ?? [];
 
-    // Build key-value map (skip section rows starting with ##)
     const data: Record<string, string> = {};
     for (const row of rows) {
       const key = (row[0] ?? "").trim();
@@ -53,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({ sheetNames, data });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[read-sheet]", err);
+    return Response.json({ error: "シートの読み込みに失敗しました" }, { status: 500 });
   }
 }

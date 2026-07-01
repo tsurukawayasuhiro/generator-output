@@ -7,6 +7,17 @@ import EngineerProfile from "./components/EngineerProfile";
 type Phase = "idle" | "fetching-sheets" | "loading" | "summarizing" | "done";
 type Tab = "card" | "profile";
 
+async function apiFetch(path: string, body: unknown) {
+  return fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-internal-token": process.env.NEXT_PUBLIC_INTERNAL_API_TOKEN ?? "",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 export default function Home() {
   const [spreadsheetId, setSpreadsheetId] = useState("");
   const [sheetName, setSheetName] = useState("");
@@ -47,10 +58,7 @@ export default function Home() {
     if (!spreadsheetId.trim()) { setError("スプレッドシート ID を入力してください"); return; }
     setError(""); setPhase("fetching-sheets");
     try {
-      const res = await fetch("/api/read-sheet", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spreadsheetId: spreadsheetId.trim() }),
-      });
+      const res = await apiFetch("/api/read-sheet", { spreadsheetId: spreadsheetId.trim() });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "読み込みに失敗しました");
       const names: string[] = json.sheetNames ?? [];
@@ -68,10 +76,7 @@ export default function Home() {
     if (!sheetName.trim()) { setError("シートを選択してください"); return; }
     setError(""); setPhase("loading");
     try {
-      const res = await fetch("/api/read-sheet", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spreadsheetId: spreadsheetId.trim(), sheetName: sheetName.trim() }),
-      });
+      const res = await apiFetch("/api/read-sheet", { spreadsheetId: spreadsheetId.trim(), sheetName: sheetName.trim() });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "読み込みに失敗しました");
       const data: Record<string, string> = json.data ?? {};
@@ -86,10 +91,7 @@ export default function Home() {
         skills: data["主戦場スキル"] ?? "",
       });
       setPhase("summarizing");
-      const sres = await fetch("/api/summarize-card", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data }),
-      });
+      const sres = await apiFetch("/api/summarize-card", { data });
       const sjson = await sres.json();
       if (!sres.ok) throw new Error(sjson.error ?? "要約生成に失敗しました");
       setFields((f) => ({ ...f, summary: sjson.summary ?? "" }));
@@ -104,10 +106,7 @@ export default function Home() {
     if (!Object.keys(rawData).length) return;
     setPhase("summarizing");
     try {
-      const res = await fetch("/api/summarize-card", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ data: rawData }),
-      });
+      const res = await apiFetch("/api/summarize-card", { data: rawData });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "失敗しました");
       setFields((f) => ({ ...f, summary: json.summary ?? "" }));

@@ -258,7 +258,8 @@ export function generatePptx(data: EngineerData): void {
   slide.addText("Engineer Profile  |  Confidential", { x:RX, y:SH-0.26, w:5, h:0.22, fontSize:9, color:C.muted });
   slide.addText(month, { x:SW-2.2, y:SH-0.26, w:2.0, h:0.22, fontSize:9, color:C.muted, align:"right" });
 
-  pptx.writeFile({ fileName: `${data["氏名"] ?? "profile"}_profile.pptx` });
+  const safeName = (data["氏名"] ?? "profile").replace(/[^\w　-鿿゠-ヿ぀-ゟ\-]/g, "_");
+  pptx.writeFile({ fileName: `${safeName}_profile.pptx` });
 }
 
 // カードテーマ（EngineerCard.tsx と同値）
@@ -399,5 +400,6 @@ export function generateCardPptx(
     });
   }
 
-  pptx.writeFile({ fileName: `${fields.name || "card"}_card.pptx` });
+  const safeName = (fields.name || "card").replace(/[^\w　-鿿゠-ヿ぀-ゟ\-]/g, "_");
+  pptx.writeFile({ fileName: `${safeName}_card.pptx` });
 }
