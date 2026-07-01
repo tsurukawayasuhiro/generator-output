@@ -86,13 +86,15 @@ export function generatePptx(data: EngineerData): void {
     ["担ってきた役割",   data["担ってきた役割"] ?? ""],
   ].filter(([, v]) => v) as [string, string][];
 
-  let ly = summary ? 2.86 : 1.88;
-  for (const [label, val] of leftFields) {
-    slide.addText(label, { x:0.22, y:ly, w:LW-0.3, h:0.22, fontSize:9, bold:true, color:"7AAED4", charSpacing:1.5 });
-    ly += 0.24;
-    slide.addText(val,   { x:0.22, y:ly, w:LW-0.3, h:0.44, fontSize:11, color:"D4E8F8", fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3 });
-    ly += 0.5;
-  }
+  // 左パネルフィールド: 残り高さを均等分割して重ならないよう配置
+  const fieldStart = summary ? 2.9 : 1.92;
+  const fieldEnd   = SH - 0.44;
+  const slotH      = leftFields.length > 0 ? (fieldEnd - fieldStart) / leftFields.length : 1.2;
+  leftFields.forEach(([label, val], fi) => {
+    const fy = fieldStart + fi * slotH;
+    slide.addText(label, { x:0.22, y:fy,        w:LW-0.3, h:0.22, fontSize:9,  bold:true, color:"7AAED4", charSpacing:1.5 });
+    slide.addText(val,   { x:0.22, y:fy+0.25,   w:LW-0.3, h:slotH-0.32, fontSize:11, color:"D4E8F8", fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.4 });
+  });
 
   // フッター
   slide.addShape(pptx.ShapeType.rect, { x:0, y:SH-0.36, w:LW, h:0.36, fill:{color:"0A1E38"}, line:{color:"0A1E38"} });
@@ -135,27 +137,28 @@ export function generatePptx(data: EngineerData): void {
 
     slide.addShape(pptx.ShapeType.rect, { x:RX, y:py, w:RW, h:projH, fill:{color:C.white}, line:{color:C.border, width:0.75}, rectRadius:0.05 });
 
-    // 案件バッジ
-    slide.addShape(pptx.ShapeType.rect, { x:RX+0.12, y:py+0.12, w:0.46, h:0.22, fill:{color:C.bluePale}, line:{color:C.blueBorder, width:0.75}, rectRadius:0.03 });
-    slide.addText(`案件 ${i+1}`, { x:RX+0.12, y:py+0.12, w:0.46, h:0.22, fontSize:9, bold:true, color:C.blue, align:"center", valign:"middle" });
+    // 案件バッジ（左上固定）
+    slide.addShape(pptx.ShapeType.rect, { x:RX+0.12, y:py+0.14, w:0.5, h:0.26, fill:{color:C.bluePale}, line:{color:C.blueBorder, width:0.75}, rectRadius:0.03 });
+    slide.addText(`案件 ${i+1}`, { x:RX+0.12, y:py+0.14, w:0.5, h:0.26, fontSize:9, bold:true, color:C.blue, align:"center", valign:"middle" });
 
-    // 概要
-    slide.addText(p.overview, { x:RX+0.64, y:py+0.1, w:projW-0.64, h:0.4, fontSize:13, bold:true, color:C.navy, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3 });
+    // 概要（タイトル）
+    slide.addText(p.overview, { x:RX+0.68, y:py+0.12, w:projW-0.68, h:0.46, fontSize:13, bold:true, color:C.navy, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.25 });
 
-    // 役割・期間・規模
+    // 役割・期間・規模（概要の下に十分な余白をとる）
     const meta = [p.role && `役割: ${p.role}`, (p.period||p.scale) && [p.period,p.scale].filter(Boolean).join(" | ")].filter(Boolean).join("　");
-    if (meta) slide.addText(meta, { x:RX+0.64, y:py+0.52, w:projW-0.64, h:0.24, fontSize:10, color:C.slate, fontFace:"Meiryo UI", lineSpacingMultiple:1.3 });
+    const metaY = py + 0.62;
+    if (meta) slide.addText(meta, { x:RX+0.68, y:metaY, w:projW-0.68, h:0.28, fontSize:10, color:C.slate, fontFace:"Meiryo UI", lineSpacingMultiple:1.3 });
 
-    // extra フィールド
+    // extra フィールド（metaの下に0.3inずつ積む）
     p.extra.slice(0, 2).forEach(({ label, value }, ei) => {
-      slide.addText(`${label}: ${value}`, { x:RX+0.64, y:py+0.52+(ei+1)*0.26, w:projW-0.64, h:0.24, fontSize:10, color:C.slate, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3 });
+      slide.addText(`${label}: ${value}`, { x:RX+0.68, y:metaY + (meta ? 0.3 : 0) + ei*0.3, w:projW-0.68, h:0.28, fontSize:10, color:C.slate, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3 });
     });
 
-    // 成果
+    // 成果（カード下部に固定）
     if (p.result) {
-      const ry = py + projH - 0.3;
-      slide.addShape(pptx.ShapeType.rect, { x:RX+0.64, y:ry, w:projW-0.7, h:0.24, fill:{color:C.greenPale}, line:{color:C.greenBorder, width:0.75}, rectRadius:0.03 });
-      slide.addText(`成果: ${p.result}`, { x:RX+0.74, y:ry+0.02, w:projW-0.9, h:0.22, fontSize:10, color:C.green, fontFace:"Meiryo UI" });
+      const ry = py + projH - 0.34;
+      slide.addShape(pptx.ShapeType.rect, { x:RX+0.68, y:ry, w:projW-0.74, h:0.26, fill:{color:C.greenPale}, line:{color:C.greenBorder, width:0.75}, rectRadius:0.03 });
+      slide.addText(`成果: ${p.result}`, { x:RX+0.78, y:ry+0.02, w:projW-0.94, h:0.24, fontSize:10, color:C.green, fontFace:"Meiryo UI" });
     }
 
     // 技術スタック（右側）
