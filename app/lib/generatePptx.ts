@@ -110,19 +110,31 @@ export function generatePptx(data: EngineerData): void {
     ["担ってきた役割",   data["担ってきた役割"] ?? ""],
   ].filter(([, v]) => v) as [string, string][];
 
-  // 左パネルフィールド: 残り高さを均等分割して重ならないよう配置
+  // 左パネルフィールド: コンパクト積み上げ（均等分割しない）
   const fieldStart = summary ? 2.9 : 1.92;
   const fieldEnd   = SH - 0.44;
-  const slotH      = leftFields.length > 0 ? (fieldEnd - fieldStart) / leftFields.length : 1.2;
-  // valH: スロット内でラベル(0.24)+上余白(0.04)+テキスト+下余白(0.24)を確保
-  // slotH - 0.52 にすることで次ラベルまで確実に0.24in空く
-  leftFields.forEach(([label, val], fi) => {
-    const fy   = fieldStart + fi * slotH;
-    const valH = Math.max(0.3, slotH - 0.52);
-    slide.addText(label, { x:0.22, y:fy,       w:LW-0.3, h:0.24, fontSize:9, bold:true, color:"7AAED4", charSpacing:1.5 });
-    slide.addText(fitText(val, LW-0.34, valH, 10, 1.3), {
-      x:0.22, y:fy+0.28, w:LW-0.3, h:valH, fontSize:10, color:"D4E8F8", fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3,
+  const LABEL_H    = 0.22;
+  const LBL_GAP    = 0.05;   // ラベル→値の隙間
+  const FIELD_GAP  = 0.2;    // フィールド間の余白
+  const LINE_H10   = (10 / 72) * 1.3 * 1.18; // 10pt での1行高さ(inch)
+  const FW         = LW - 0.34;
+
+  let curY = fieldStart;
+  leftFields.forEach(([label, val]) => {
+    if (curY + LABEL_H + 0.2 > fieldEnd) return; // スペース不足はスキップ
+    // 実際の行数を推定してvalHを決定
+    const charW = (10 * 0.55) / 72;
+    const cpl   = Math.max(1, Math.floor(FW / charW));
+    const lines = Math.min(Math.ceil(val.length / cpl), 4);
+    const valH  = Math.min(lines * LINE_H10 + 0.04, fieldEnd - curY - LABEL_H - LBL_GAP - FIELD_GAP);
+    if (valH < 0.15) return;
+
+    slide.addText(label, { x:0.22, y:curY, w:LW-0.3, h:LABEL_H, fontSize:9, bold:true, color:"7AAED4", charSpacing:1.5 });
+    slide.addText(fitText(val, FW, valH, 10, 1.3), {
+      x:0.22, y:curY + LABEL_H + LBL_GAP, w:LW-0.3, h:valH,
+      fontSize:10, color:"D4E8F8", fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3,
     });
+    curY += LABEL_H + LBL_GAP + valH + FIELD_GAP;
   });
 
   // フッター
@@ -170,8 +182,10 @@ export function generatePptx(data: EngineerData): void {
     slide.addShape(pptx.ShapeType.rect, { x:RX+0.12, y:py+0.14, w:0.5, h:0.26, fill:{color:C.bluePale}, line:{color:C.blueBorder, width:0.75}, rectRadius:0.03 });
     slide.addText(`案件 ${i+1}`, { x:RX+0.12, y:py+0.14, w:0.5, h:0.26, fontSize:9, bold:true, color:C.blue, align:"center", valign:"middle" });
 
-    // カード内の固定ゾーン配置
-    const TITLE_H = 0.46;  // 概要（タイトル）高さ: 13pt × 2行
+    // カード内の固定ゾーン配置（タイトル高さは行数から動的計算）
+    const titleCharsPerLine = Math.max(1, Math.floor((projW - 0.7) / ((13 * 0.65) / 72)));
+    const titleLines = Math.min(Math.ceil(p.overview.length / titleCharsPerLine), 3);
+    const TITLE_H = titleLines * ((13 / 72) * 1.25 * 1.18) + 0.06; // 行数×1行高さ+余白
     const META_H  = 0.28;  // 役割・規模 高さ: 10pt × 1行
     const RES_H   = p.result ? 0.32 : 0;
     const GAP     = 0.06;
