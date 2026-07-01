@@ -1,0 +1,1000 @@
+
+<title>エンジニア名鑑ツール — アーキテクチャガイド</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:       #0F2744;
+    --navy-mid:   #1A3A5C;
+    --blue:       #0057B8;
+    --blue-pale:  #E8F1FB;
+    --blue-border:#C0D8F5;
+    --orange:     #D97706;
+    --green:      #065F46;
+    --green-pale: #D1FAE5;
+    --slate:      #4A5F78;
+    --muted:      #7A90A8;
+    --border:     #D4DDE8;
+    --bg:         #F5F8FC;
+    --white:      #FFFFFF;
+    --code-bg:    #162032;
+    --code-border:#243652;
+
+    --kw:   #7EC8F5;   /* keyword */
+    --str:  #98D9A4;   /* string */
+    --cm:   #5A7A96;   /* comment */
+    --fn:   #F0C070;   /* function */
+    --typ:  #7BE4C8;   /* type */
+    --num:  #F0A060;   /* number */
+    --prop: #B0D8FF;   /* property */
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--slate);
+    background: var(--bg);
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 252px;
+    flex-shrink: 0;
+    background: var(--navy);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 2px; }
+
+  .sidebar-header {
+    padding: 24px 20px 18px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .sidebar-eyebrow {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.3);
+    margin-bottom: 6px;
+  }
+  .sidebar-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--white);
+    line-height: 1.4;
+  }
+  .sidebar-sub {
+    font-size: 11px;
+    color: rgba(255,255,255,.4);
+    margin-top: 3px;
+  }
+
+  .nav { padding: 14px 0 24px; }
+  .nav-section {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,.25);
+    padding: 14px 20px 6px;
+  }
+  .nav a {
+    display: block;
+    padding: 5px 20px 5px 28px;
+    font-size: 12px;
+    color: rgba(255,255,255,.55);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: color .15s, border-color .15s, background .15s;
+    position: relative;
+  }
+  .nav a:hover { color: rgba(255,255,255,.85); background: rgba(255,255,255,.04); }
+  .nav a.active { color: #7EC8F5; border-left-color: #7EC8F5; background: rgba(126,200,245,.07); }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 14px 20px;
+    border-top: 1px solid rgba(255,255,255,.08);
+    font-size: 10px;
+    color: rgba(255,255,255,.2);
+  }
+
+  /* ── Main ── */
+  .main {
+    flex: 1;
+    min-width: 0;
+    padding: 48px 56px 80px;
+    max-width: 920px;
+  }
+
+  /* ── Section ── */
+  .section { margin-bottom: 64px; }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--navy);
+    letter-spacing: -.02em;
+    line-height: 1.2;
+    margin-bottom: 8px;
+    text-wrap: balance;
+  }
+  .page-sub {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 40px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: -.01em;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  h2 .tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: var(--blue-pale);
+    color: var(--blue);
+    border: 1px solid var(--blue-border);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+
+  h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--navy);
+    letter-spacing: .03em;
+    text-transform: uppercase;
+    margin: 28px 0 10px;
+  }
+
+  p { margin-bottom: 12px; color: var(--slate); }
+  p:last-child { margin-bottom: 0; }
+
+  /* ── Overview diagram ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 28px;
+    overflow-x: auto;
+    margin-bottom: 24px;
+  }
+  .flow-node {
+    flex-shrink: 0;
+    text-align: center;
+  }
+  .flow-box {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 108px;
+    min-height: 68px;
+    border-radius: 8px;
+    padding: 10px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+  .flow-box .icon { font-size: 20px; margin-bottom: 5px; display: block; }
+  .flow-box.sheets  { background: #E6F4EA; color: #1B6B3A; border: 1px solid #A8D5B5; }
+  .flow-box.api     { background: var(--blue-pale); color: var(--blue); border: 1px solid var(--blue-border); }
+  .flow-box.ai      { background: #F3E8FF; color: #6B21A8; border: 1px solid #DDD6FE; }
+  .flow-box.ui      { background: #FEF3C7; color: #92400E; border: 1px solid #F5D78A; }
+  .flow-box.pptx    { background: var(--green-pale); color: var(--green); border: 1px solid #99D8C0; }
+  .flow-arrow {
+    font-size: 18px;
+    color: var(--border);
+    padding: 0 6px;
+    flex-shrink: 0;
+    align-self: center;
+    margin-top: -8px;
+  }
+  .flow-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 5px;
+  }
+
+  /* ── Tech stack grid ── */
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stack-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .stack-card-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--navy);
+    margin-bottom: 3px;
+  }
+  .stack-card-role {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .stack-card-version {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--blue);
+    background: var(--blue-pale);
+    border: 1px solid var(--blue-border);
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-top: 6px;
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  }
+
+  /* ── File tree ── */
+  .file-tree {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.8;
+    overflow-x: auto;
+  }
+  .ft-dir  { color: var(--kw); }
+  .ft-file { color: rgba(255,255,255,.75); }
+  .ft-note { color: var(--cm); font-style: italic; }
+  .ft-key  { color: var(--fn); }
+
+  /* ── Code block ── */
+  .code-wrap {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: rgba(255,255,255,.04);
+    border-bottom: 1px solid var(--code-border);
+  }
+  .code-filename {
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 11px;
+    color: rgba(255,255,255,.5);
+  }
+  .code-lang {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: rgba(255,255,255,.2);
+  }
+  pre {
+    padding: 18px 22px;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    color: rgba(255,255,255,.82);
+  }
+  pre::-webkit-scrollbar { height: 4px; }
+  pre::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 2px; }
+
+  .kw   { color: var(--kw); }
+  .str  { color: var(--str); }
+  .cm   { color: var(--cm); font-style: italic; }
+  .fn   { color: var(--fn); }
+  .typ  { color: var(--typ); }
+  .num  { color: var(--num); }
+  .prop { color: var(--prop); }
+
+  /* ── Callout ── */
+  .callout {
+    display: flex;
+    gap: 12px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 13px;
+  }
+  .callout-icon { flex-shrink: 0; font-size: 16px; margin-top: 1px; }
+  .callout.info    { background: var(--blue-pale);  border: 1px solid var(--blue-border); color: #1A3A6A; }
+  .callout.warn    { background: #FEF3C7; border: 1px solid #F5D78A; color: #78350F; }
+  .callout.gotcha  { background: #FEE2E2; border: 1px solid #FCA5A5; color: #7F1D1D; }
+  .callout.tip     { background: var(--green-pale); border: 1px solid #99D8C0; color: #064E3B; }
+
+  /* ── Env table ── */
+  .env-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .env-table th {
+    background: var(--bg);
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    padding: 9px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .env-table td {
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .env-table tr:last-child td { border-bottom: none; }
+  .env-table .key {
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 12px;
+    color: var(--navy);
+    white-space: nowrap;
+  }
+  .env-table .desc { color: var(--slate); line-height: 1.5; }
+  .env-table .req {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: #FEE2E2;
+    color: #991B1B;
+  }
+
+  /* ── Spreadsheet columns ── */
+  .sheet-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .sheet-table th {
+    background: var(--bg);
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    padding: 9px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  .sheet-table td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+  .sheet-table tr:last-child td { border-bottom: none; }
+  .sheet-table .col-a {
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 12px;
+    color: var(--navy);
+    white-space: nowrap;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 3px;
+  }
+  .badge.required { background: #FEE2E2; color: #991B1B; }
+  .badge.optional { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+  .badge.dynamic  { background: #F3E8FF; color: #6B21A8; }
+
+  /* ── Gotchas list ── */
+  .gotcha-list { display: flex; flex-direction: column; gap: 12px; }
+  .gotcha-item {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px 14px 18px;
+    border-left: 3px solid var(--orange);
+    font-size: 13px;
+  }
+  .gotcha-title { font-weight: 700; color: var(--navy); margin-bottom: 5px; }
+  .gotcha-body { color: var(--slate); line-height: 1.55; }
+  .gotcha-body code {
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 11.5px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--navy);
+  }
+
+  /* inline code */
+  code {
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 11.5px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--navy);
+  }
+
+  @media (max-width: 800px) {
+    .sidebar { display: none; }
+    .main { padding: 28px 20px 60px; }
+    h1 { font-size: 22px; }
+  }
+</style>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-eyebrow">Atware Internal Tools</div>
+    <div class="sidebar-title">エンジニア名鑑<br>生成ツール</div>
+    <div class="sidebar-sub">アーキテクチャガイド</div>
+  </div>
+  <div class="nav">
+    <div class="nav-section">概要</div>
+    <a href="#overview">ツール概要</a>
+    <a href="#flow">データフロー</a>
+    <a href="#stack">技術スタック</a>
+    <div class="nav-section">実装</div>
+    <a href="#structure">ディレクトリ構成</a>
+    <a href="#env">環境変数</a>
+    <a href="#sheet">スプレッドシート形式</a>
+    <div class="nav-section">コード</div>
+    <a href="#api-sheet">API: read-sheet</a>
+    <a href="#api-summarize">API: summarize-card</a>
+    <a href="#pptx-profile">PPTX: 詳細プロフィール</a>
+    <a href="#pptx-card">PPTX: トレーディングカード</a>
+    <a href="#page">page.tsx 入力フロー</a>
+    <div class="nav-section">注意点</div>
+    <a href="#gotchas">pptxgenjs の落とし穴</a>
+  </div>
+  <div class="sidebar-footer">v1.0 · 2026-07</div>
+</nav>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- Page header -->
+  <h1 id="overview">エンジニア名鑑 生成ツール</h1>
+  <p class="page-sub">Google Sheets のデータを読み込み、トレーディングカード（PPTX）と詳細プロフィールスライド（PPTX）を自動生成する Next.js 製社内ツール。このドキュメントを読めば同等のシステムを再構築できる。</p>
+
+  <!-- ── Overview ── -->
+  <section class="section" id="overview-section">
+    <h2>ツール概要</h2>
+    <p>営業・採用シーンで使えるエンジニア紹介資料を、スプレッドシートを編集せずにワンクリックで生成する。AI（GPT-4o）が紹介文を自動生成し、pptxgenjs がブラウザ内で PPTX を組み立てて直接ダウンロードする。</p>
+
+    <h3>生成できる成果物</h3>
+    <div class="stack-grid">
+      <div class="stack-card">
+        <div class="stack-card-name">トレーディングカード</div>
+        <div class="stack-card-role">名前・キャッチフレーズ・スキル・AI紹介文。5種類のカラーテーマ対応。PPTX 形式で出力。</div>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-name">詳細プロフィール（16:9）</div>
+        <div class="stack-card-role">左パネル＋右エリアの2カラム構成。代表案件・価値の出し方・こだわりを1枚のスライドに凝縮。PPTX 形式で出力。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Flow ── -->
+  <section class="section" id="flow">
+    <h2>データフロー</h2>
+
+    <div class="flow">
+      <div class="flow-node">
+        <div class="flow-box sheets"><span class="icon">📊</span>Google Sheets</div>
+        <div class="flow-label">A列: キー / B列: 値</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="flow-box api"><span class="icon">⚡</span>API Route<br>/api/read-sheet</div>
+        <div class="flow-label">googleapis（Service Account）</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="flow-box ai"><span class="icon">🤖</span>API Route<br>/api/summarize-card</div>
+        <div class="flow-label">GPT-4o で紹介文生成</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="flow-box ui"><span class="icon">🖥️</span>React UI<br>プレビュー</div>
+        <div class="flow-label">HTML プレビュー・編集</div>
+      </div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-node">
+        <div class="flow-box pptx"><span class="icon">📥</span>pptxgenjs<br>（クライアント）</div>
+        <div class="flow-label">ブラウザ内で .pptx 生成</div>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <span class="callout-icon">ℹ️</span>
+      <span>PPTX 生成はサーバーを経由しない。<code>generatePptx</code> / <code>generateCardPptx</code> は <code>dynamic import</code> でクライアント側に遅延ロードされ、ブラウザ内でファイルを組み立てて直接ダウンロードする。</span>
+    </div>
+  </section>
+
+  <!-- ── Stack ── -->
+  <section class="section" id="stack">
+    <h2>技術スタック</h2>
+    <div class="stack-grid">
+      <div class="stack-card">
+        <div class="stack-card-name">Next.js</div>
+        <div class="stack-card-role">App Router。API Routes（Server Components）とクライアント UI を同一リポジトリで管理。</div>
+        <span class="stack-card-version">16.2.9</span>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-name">googleapis</div>
+        <div class="stack-card-role">Google Sheets API v4。Service Account 認証で読み取り専用アクセス。</div>
+        <span class="stack-card-version">^173.0.0</span>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-name">openai</div>
+        <div class="stack-card-role">GPT-4o で 80〜100 字の紹介文を生成。プロンプトは API Route 側に閉じる。</div>
+        <span class="stack-card-version">^6.45.0</span>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-name">pptxgenjs</div>
+        <div class="stack-card-role">ブラウザ／Node.js 両対応の PPTX ライブラリ。座標系はすべてインチ単位。</div>
+        <span class="stack-card-version">^4.0.1</span>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-name">React 19 + Tailwind 4</div>
+        <div class="stack-card-role">プレビュー UI。Tailwind はユーティリティクラス中心、カードは inline style で厳密に寸法管理。</div>
+        <span class="stack-card-version">19.2.4 / ^4</span>
+      </div>
+      <div class="stack-card">
+        <div class="stack-card-name">zod</div>
+        <div class="stack-card-role">API Route の入力バリデーション用（現状は軽量利用）。</div>
+        <span class="stack-card-version">^4.4.3</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Structure ── -->
+  <section class="section" id="structure">
+    <h2>ディレクトリ構成</h2>
+    <div class="file-tree"><span class="ft-dir">app/</span>
+├── <span class="ft-dir">api/</span>
+│   ├── <span class="ft-dir">read-sheet/</span>
+│   │   └── <span class="ft-file">route.ts</span>          <span class="ft-note">← Sheets 読み取り + シート名一覧</span>
+│   └── <span class="ft-dir">summarize-card/</span>
+│       └── <span class="ft-file">route.ts</span>          <span class="ft-note">← GPT-4o で紹介文生成</span>
+├── <span class="ft-dir">components/</span>
+│   ├── <span class="ft-file">EngineerCard.tsx</span>       <span class="ft-note">← トレーディングカード HTML プレビュー</span>
+│   └── <span class="ft-file">EngineerProfile.tsx</span>   <span class="ft-note">← 詳細プロフィール HTML プレビュー（16:9）</span>
+├── <span class="ft-dir">lib/</span>
+│   └── <span class="ft-file">generatePptx.ts</span>       <span class="ft-key">← PPTX 生成コア（クライアント専用）</span>
+├── <span class="ft-file">page.tsx</span>                   <span class="ft-note">← メイン UI・入力フロー</span>
+└── <span class="ft-file">globals.css</span>
+
+<span class="ft-file">.env.local</span>                     <span class="ft-note">← 環境変数（git 管理外）</span>
+<span class="ft-file">package.json</span>
+<span class="ft-file">tsconfig.json</span></div>
+  </section>
+
+  <!-- ── Env ── -->
+  <section class="section" id="env">
+    <h2>環境変数</h2>
+    <table class="env-table">
+      <thead>
+        <tr>
+          <th>変数名</th>
+          <th>内容</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="key">GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_B64</td>
+          <td class="desc">Google Cloud Service Account の JSON キーを Base64 エンコードした文字列。<br><code>base64 -w 0 key.json</code> で生成。スプレッドシートの「共有」にこのアカウントを閲覧者として追加する必要がある。</td>
+          <td><span class="req">必須</span></td>
+        </tr>
+        <tr>
+          <td class="key">OPENAI_API_KEY</td>
+          <td class="desc">OpenAI API キー。紹介文生成（GPT-4o）に使用。</td>
+          <td><span class="req">必須</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="callout warn" style="margin-top:14px">
+      <span class="callout-icon">⚠️</span>
+      <span><code>NEXT_PUBLIC_</code> プレフィックスは付けない。両変数は API Route（サーバー側）からのみ参照され、クライアントには公開しない。</span>
+    </div>
+  </section>
+
+  <!-- ── Sheet format ── -->
+  <section class="section" id="sheet">
+    <h2>スプレッドシート形式</h2>
+    <p>1シート = 1人分のデータ。<strong>A列にキー、B列に値</strong>の縦並び形式。<code>##</code> で始まる行はセクション見出しとして読み飛ばされる。</p>
+
+    <table class="sheet-table">
+      <thead>
+        <tr><th>A列（キー）</th><th>B列（値の例）</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="col-a">氏名</td><td>田中 誠一</td><td><span class="badge required">必須</span></td></tr>
+        <tr><td class="col-a">キャッチフレーズ</td><td>問題解決の架け橋で笑顔を創るエンジニア</td><td><span class="badge required">必須</span></td></tr>
+        <tr><td class="col-a">エンジニアタイプ</td><td>課題整理型、橋渡し型</td><td><span class="badge required">必須</span></td></tr>
+        <tr><td class="col-a">主戦場スキル</td><td>Java, Spring Boot, TypeScript, Next.js</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">担ってきた役割</td><td>SE、テックリード、PL</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">価値の出し方1〜3</td><td>複雑な課題をシンプルに整理し価値を生む</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">こだわり1〜3</td><td>コードと共に成長するドキュメントを育てる</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">案件1：概要</td><td>大手製造業の基幹系システム刷新プロジェクト</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">案件1：技術スタック</td><td>Java, Spring Boot, PostgreSQL, Kubernetes</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">案件1：役割</td><td>テックリード／チーム8名（うち客先3名）</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">案件1：期間</td><td>2022年4月〜2023年6月</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">案件1：規模</td><td>チーム8名</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">案件1：成果</td><td>当初18ヶ月予定を15ヶ月で完了</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">案件1：<em>任意フィールド名</em></td><td>行動と成果: 【状況】…【行動】…【結果】…</td><td><span class="badge dynamic">動的</span></td></tr>
+        <tr><td class="col-a">エンジニアをやっている理由・原動力</td><td>（AI紹介文生成に使用）</td><td><span class="badge optional">任意</span></td></tr>
+        <tr><td class="col-a">自慢のエピソード</td><td>（AI紹介文生成に使用）</td><td><span class="badge optional">任意</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout tip" style="margin-top:14px">
+      <span class="callout-icon">💡</span>
+      <span><strong>動的フィールドの扱い</strong>：<code>案件N：</code> プレフィックスで始まる未知のキーは <code>extra</code> 配列として収集され、PPTX の詳細テキストボックスに自動追記される。スプレッドシートのカラム追加だけで新項目が反映される設計。</span>
+    </div>
+  </section>
+
+  <!-- ── API: read-sheet ── -->
+  <section class="section" id="api-sheet">
+    <h2>API Route: <code style="font-size:16px">/api/read-sheet</code> <span class="tag">Server</span></h2>
+    <p><code>spreadsheetId</code> のみ送ると全シート名を返す（Step 1）。<code>sheetName</code> も送るとそのシートのキー/値マップを返す（Step 2）。2段階にすることでドロップダウン選択を実現。</p>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <span class="code-filename">app/api/read-sheet/route.ts</span>
+        <span class="code-lang">TypeScript</span>
+      </div>
+      <pre><span class="kw">import</span> { google } <span class="kw">from</span> <span class="str">"googleapis"</span>;
+<span class="kw">import</span> { NextRequest } <span class="kw">from</span> <span class="str">"next/server"</span>;
+
+<span class="kw">function</span> <span class="fn">getAuth</span>() {
+  <span class="kw">const</span> b64 = process.env.<span class="prop">GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_B64</span>;
+  <span class="kw">if</span> (!b64) <span class="kw">throw new</span> <span class="fn">Error</span>(<span class="str">"GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_B64 is not set"</span>);
+  <span class="kw">const</span> credentials = <span class="fn">JSON.parse</span>(Buffer.<span class="fn">from</span>(b64, <span class="str">"base64"</span>).<span class="fn">toString</span>(<span class="str">"utf-8"</span>));
+  <span class="kw">return new</span> google.auth.<span class="fn">GoogleAuth</span>({
+    credentials,
+    scopes: [<span class="str">"https://www.googleapis.com/auth/spreadsheets.readonly"</span>],
+  });
+}
+
+<span class="kw">export async function</span> <span class="fn">POST</span>(request: <span class="typ">NextRequest</span>) {
+  <span class="kw">const</span> { spreadsheetId, sheetName } = <span class="kw">await</span> request.<span class="fn">json</span>();
+  <span class="kw">const</span> sheets = google.<span class="fn">sheets</span>({ version: <span class="str">"v4"</span>, auth: <span class="fn">getAuth</span>() });
+
+  <span class="cm">// 常にシート名一覧を取得</span>
+  <span class="kw">const</span> meta = <span class="kw">await</span> sheets.spreadsheets.<span class="fn">get</span>({ spreadsheetId });
+  <span class="kw">const</span> sheetNames = meta.data.sheets
+    ?.<span class="fn">map</span>((s) => s.properties?.title ?? <span class="str">""</span>).<span class="fn">filter</span>(Boolean) ?? [];
+
+  <span class="cm">// sheetName なし → シート名一覧のみ返す（ドロップダウン用）</span>
+  <span class="kw">if</span> (!sheetName) <span class="kw">return</span> Response.<span class="fn">json</span>({ sheetNames, data: {} });
+
+  <span class="cm">// A:B 列を読み込んでキー/値マップに変換</span>
+  <span class="kw">const</span> res = <span class="kw">await</span> sheets.spreadsheets.values.<span class="fn">get</span>({
+    spreadsheetId, range: <span class="str">`'${sheetName}'!A:B`</span>,
+  });
+  <span class="kw">const</span> data: Record&lt;<span class="typ">string</span>, <span class="typ">string</span>&gt; = {};
+  <span class="kw">for</span> (<span class="kw">const</span> row <span class="kw">of</span> res.data.values ?? []) {
+    <span class="kw">const</span> key = (row[<span class="num">0</span>] ?? <span class="str">""</span>).<span class="fn">trim</span>();
+    <span class="kw">const</span> value = (row[<span class="num">1</span>] ?? <span class="str">""</span>).<span class="fn">trim</span>();
+    <span class="cm">// ## 始まりはセクション見出しなのでスキップ</span>
+    <span class="kw">if</span> (key && !key.<span class="fn">startsWith</span>(<span class="str">"##"</span>)) data[key] = value;
+  }
+  <span class="kw">return</span> Response.<span class="fn">json</span>({ sheetNames, data });
+}</pre>
+    </div>
+  </section>
+
+  <!-- ── API: summarize-card ── -->
+  <section class="section" id="api-summarize">
+    <h2>API Route: <code style="font-size:16px">/api/summarize-card</code> <span class="tag">Server</span></h2>
+    <p>スプレッドシートデータを受け取り、GPT-4o で 80〜100 字の営業用紹介文を生成する。氏名を主語にしない、体言止め禁止など、商用シーンに適した制約をプロンプトに組み込む。</p>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <span class="code-filename">app/api/summarize-card/route.ts</span>
+        <span class="code-lang">TypeScript</span>
+      </div>
+      <pre><span class="kw">import</span> OpenAI <span class="kw">from</span> <span class="str">"openai"</span>;
+<span class="kw">const</span> client = <span class="kw">new</span> <span class="fn">OpenAI</span>({ apiKey: process.env.<span class="prop">OPENAI_API_KEY</span> });
+
+<span class="kw">export async function</span> <span class="fn">POST</span>(request: <span class="typ">NextRequest</span>) {
+  <span class="kw">const</span> data = ((<span class="kw">await</span> request.<span class="fn">json</span>()).data) <span class="kw">as</span> Record&lt;<span class="typ">string</span>, <span class="typ">string</span>&gt;;
+
+  <span class="kw">const</span> prompt = <span class="str">`以下のエンジニア情報をもとに、営業・提案シーンで使える簡潔な紹介文を
+80〜100文字で生成してください。
+
+【制約】
+- 「${data["氏名"]}は〜」のような氏名主語の書き出しは禁止
+- 体言止めは使わず、自然な文体で
+- 80〜100文字に厳密に収めること
+- 紹介文のみを出力（見出し・説明不要）
+
+氏名: ${data["氏名"]}
+エンジニアタイプ: ${data["エンジニアタイプ"]}
+キャッチフレーズ: ${data["キャッチフレーズ"]}
+エンジニアをやっている理由: ${data["エンジニアをやっている理由・原動力"]}
+自慢のエピソード: ${data["自慢のエピソード"]}`</span>;
+
+  <span class="kw">const</span> response = <span class="kw">await</span> client.chat.completions.<span class="fn">create</span>({
+    model: <span class="str">"gpt-4o"</span>,
+    messages: [{ role: <span class="str">"user"</span>, content: prompt }],
+    max_tokens: <span class="num">400</span>,
+  });
+  <span class="kw">const</span> summary = response.choices[<span class="num">0</span>]?.message?.content?.<span class="fn">trim</span>() ?? <span class="str">""</span>;
+  <span class="kw">return</span> Response.<span class="fn">json</span>({ summary });
+}</pre>
+    </div>
+  </section>
+
+  <!-- ── PPTX: Profile ── -->
+  <section class="section" id="pptx-profile">
+    <h2>PPTX 生成: 詳細プロフィール <span class="tag">Client</span></h2>
+    <p><code>generatePptx(data)</code> をクライアントから <code>dynamic import</code> で呼び出す。サーバーを経由しないため認証・課金が発生しない。</p>
+
+    <div class="callout info">
+      <span class="callout-icon">📐</span>
+      <span>レイアウト座標系：<code>LAYOUT_WIDE</code> = <strong>13.33 × 7.5 インチ</strong>。すべての x/y/w/h はインチ単位。フォントサイズは pt。</span>
+    </div>
+
+    <h3>レイアウト定数</h3>
+    <div class="code-wrap">
+      <div class="code-header">
+        <span class="code-filename">app/lib/generatePptx.ts — 定数</span>
+        <span class="code-lang">TypeScript</span>
+      </div>
+      <pre><span class="kw">const</span> LW  = <span class="num">2.6</span>;    <span class="cm">// 左パネル幅 (in)</span>
+<span class="kw">const</span> RX  = <span class="num">2.75</span>;   <span class="cm">// 右エリア開始 X</span>
+<span class="kw">const</span> RW  = <span class="num">10.4</span>;   <span class="cm">// 右エリア幅</span>
+<span class="kw">const</span> SW  = <span class="num">13.33</span>;  <span class="cm">// スライド幅</span>
+<span class="kw">const</span> SH  = <span class="num">7.5</span>;    <span class="cm">// スライド高さ</span>
+
+<span class="kw">const</span> KOD_LABEL_Y = <span class="num">5.94</span>;  <span class="cm">// こだわりセクション Y（固定）</span>
+<span class="kw">const</span> PROJ_TOP    = <span class="num">1.66</span>;  <span class="cm">// 代表案件カード開始 Y</span>
+<span class="cm">// projH = (KOD_LABEL_Y - 0.1 - PROJ_TOP) / numProjs  ← 案件数で等分</span></pre>
+    </div>
+
+    <h3>fitText — テキスト切り詰めヘルパー</h3>
+    <p>pptxgenjs の <code>shrinkText</code> / <code>fit:"shrink"</code> は OOXML の <code>&lt;a:normAutofit/&gt;</code> に依存するが、実際の動作が不安定。JS 側で文字数を計算して切り詰める方が確実。</p>
+    <div class="code-wrap">
+      <div class="code-header">
+        <span class="code-filename">app/lib/generatePptx.ts — fitText()</span>
+        <span class="code-lang">TypeScript</span>
+      </div>
+      <pre><span class="kw">function</span> <span class="fn">fitText</span>(
+  text: <span class="typ">string</span>, wIn: <span class="typ">number</span>, hIn: <span class="typ">number</span>,
+  fontSize: <span class="typ">number</span>, lineSpacing = <span class="num">1.3</span>, isBold = <span class="kw">false</span>
+): <span class="typ">string</span> {
+  <span class="cm">// 1文字幅: pt → inch 換算。日本語/太字は 0.65、通常は 0.58</span>
+  <span class="kw">const</span> charW = (fontSize * (isBold ? <span class="num">0.65</span> : <span class="num">0.58</span>)) / <span class="num">72</span>;
+  <span class="cm">// 1行高さ: pptxgenjs 内部余白補正として 1.15 を掛ける</span>
+  <span class="kw">const</span> lineH = (fontSize / <span class="num">72</span>) * lineSpacing * <span class="num">1.15</span>;
+  <span class="kw">const</span> charsPerLine = Math.<span class="fn">max</span>(<span class="num">1</span>, Math.<span class="fn">floor</span>(wIn / charW));
+  <span class="kw">const</span> maxLines     = Math.<span class="fn">max</span>(<span class="num">1</span>, Math.<span class="fn">floor</span>(hIn / lineH));
+  <span class="kw">const</span> maxChars     = charsPerLine * maxLines;
+  <span class="kw">if</span> (text.length <= maxChars) <span class="kw">return</span> text;
+  <span class="kw">return</span> text.<span class="fn">slice</span>(<span class="num">0</span>, maxChars - <span class="num">1</span>) + <span class="str">"…"</span>;
+}</pre>
+    </div>
+
+    <h3>案件カードの詳細テキスト配置</h3>
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <span><strong>重要な落とし穴：</strong>pptxgenjs のテキストボックスはデフォルトで <code>anchor="ctr"</code>（垂直中央揃え）。複数テキストボックスに分割すると、背の高いボックス内でテキストが中央に配置され余白に見える。役割・規模・追加フィールドを<strong>1つのテキストボックスに結合</strong>することで解決。</span>
+    </div>
+    <div class="code-wrap">
+      <div class="code-header">
+        <span class="code-filename">app/lib/generatePptx.ts — 案件カード詳細部分</span>
+        <span class="code-lang">TypeScript</span>
+      </div>
+      <pre><span class="kw">const</span> titleY  = py + <span class="num">0.08</span>;
+<span class="kw">const</span> detailY = titleY + TITLE_H + <span class="num">0.04</span>;
+<span class="kw">const</span> detailH = projH - (detailY - py) - RES_H - <span class="num">0.04</span>;
+
+<span class="cm">// meta（役割・期間・規模）と extra フィールドを1ボックスに統合</span>
+<span class="cm">// → anchor:ctr による上余白問題を構造的に解決</span>
+<span class="kw">const</span> detailLines = [
+  ...(meta ? [meta] : []),
+  ...extras.<span class="fn">map</span>(({ label, value }) => <span class="str">`${label}: ${value}`</span>),
+];
+<span class="kw">if</span> (detailLines.length > <span class="num">0</span>) {
+  slide.<span class="fn">addText</span>(<span class="fn">fitText</span>(detailLines.<span class="fn">join</span>(<span class="str">"\n"</span>), projW-<span class="num">0.84</span>, detailH, <span class="num">10</span>, <span class="num">1.4</span>), {
+    x: RX+<span class="num">0.84</span>, y: detailY, w: projW-<span class="num">0.84</span>, h: detailH,
+    fontSize: <span class="num">10</span>, color: C.slate, fontFace: <span class="str">"Meiryo UI"</span>,
+    wrap: <span class="kw">true</span>, lineSpacingMultiple: <span class="num">1.4</span>,
+    valign: <span class="str">"top"</span>, margin: <span class="num">0</span>,  <span class="cm">// margin:0 = 内部余白ゼロ（lIns/tIns/bIns/rIns すべて）</span>
+  });
+}</pre>
+    </div>
+  </section>
+
+  <!-- ── PPTX: Card ── -->
+  <section class="section" id="pptx-card">
+    <h2>PPTX 生成: トレーディングカード <span class="tag">Client</span></h2>
+    <p><code>generateCardPptx(fields, themeId)</code>。16:9 スライドの中央にカードを配置する。テーマ色（5種）は <code>EngineerCard.tsx</code> と同じ値をミラーリング。</p>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <span class="code-filename">app/lib/generatePptx.ts — generateCardPptx() 主要部分</span>
+        <span class="code-lang">TypeScript</span>
+      </div>
+      <pre><span class="kw">export function</span> <span class="fn">generateCardPptx</span>(
+  fields: { name: <span class="typ">string</span>; engineerType: <span class="typ">string</span>; catchphrase: <span class="typ">string</span>;
+            summary: <span class="typ">string</span>; skills: <span class="typ">string</span> },
+  themeId: <span class="typ">string</span> = <span class="str">"white"</span>
+) {
+  <span class="kw">const</span> CW = <span class="num">3.2</span>;   <span class="cm">// カード幅 (in)</span>
+  <span class="kw">const</span> CH = <span class="num">5.0</span>;   <span class="cm">// カード高さ (in)</span>
+  <span class="kw">const</span> CX = (SW - CW) / <span class="num">2</span>;  <span class="cm">// 水平中央配置</span>
+  <span class="kw">const</span> CY = (SH - CH) / <span class="num">2</span>;  <span class="cm">// 垂直中央配置</span>
+  <span class="kw">const</span> AVH = <span class="num">1.1</span>;  <span class="cm">// アバターエリア高さ</span>
+
+  <span class="cm">// アバター角丸の下半分を塗りつぶして直角に見せるテクニック</span>
+  slide.<span class="fn">addShape</span>(pptx.ShapeType.rect, {
+    x: CX, y: CY, w: CW, h: AVH, fill: { color: theme.avatarBg },
+    line: { color: theme.border, width: <span class="num">0</span> }, rectRadius: R,
+  });
+  slide.<span class="fn">addShape</span>(pptx.ShapeType.rect, {  <span class="cm">// 下半分を角丸なしで上書き</span>
+    x: CX, y: CY + AVH * <span class="num">0.5</span>, w: CW, h: AVH * <span class="num">0.5</span>,
+    fill: { color: theme.avatarBg }, line: { color: <span class="str">"FFFFFF"</span>, width: <span class="num">0</span> },
+  });
+
+  <span class="cm">// テキストボックスは可変の BY を使って積み上げ配置</span>
+  <span class="kw">let</span> BY = CY + AVH + <span class="num">0.16</span>;
+  <span class="cm">// engineerType → catchphrase → divider → summary → skills</span>
+  <span class="cm">// 各要素の高さを推定して BY を加算していく</span>
+
+  pptx.<span class="fn">writeFile</span>({ fileName: <span class="str">`${fields.name || "card"}_card.pptx`</span> });
+}</pre>
+    </div>
+  </section>
+
+  <!-- ── page.tsx ── -->
+  <section class="section" id="page">
+    <h2>page.tsx — 入力フロー <span class="tag">Client</span></h2>
+    <p>2ステップ入力：スプレッドシート ID を入力してシート名を取得 → ドロップダウンで選択 → データ読み込み＋AI 要約生成。</p>
+
+    <div class="code-wrap">
+      <div class="code-header">
+        <span class="code-filename">app/page.tsx — フロー関数</span>
+        <span class="code-lang">TypeScript</span>
+      </div>
+      <pre><span class="cm">// Phase 1: シート名一覧を取得（sheetName を送らない）</span>
+<span class="kw">async function</span> <span class="fn">handleFetchSheets</span>() {
+  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">"/api/read-sheet"</span>, {
+    method: <span class="str">"POST"</span>,
+    body: <span class="fn">JSON.stringify</span>({ spreadsheetId }),
+  });
+  <span class="kw">const</span> { sheetNames } = <span class="kw">await</span> res.<span class="fn">json</span>();
+  <span class="fn">setSheetNames</span>(sheetNames);
+  <span class="fn">setSheetName</span>(sheetNames[<span class="num">0</span>] ?? <span class="str">""</span>);  <span class="cm">// 先頭を初期選択</span>
+}
+
+<span class="cm">// Phase 2: データ読み込み → AI 要約生成</span>
+<span class="kw">async function</span> <span class="fn">handleLoad</span>() {
+  <span class="kw">const</span> { data } = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">"/api/read-sheet"</span>, {
+    body: <span class="fn">JSON.stringify</span>({ spreadsheetId, sheetName }),
+  }).<span class="fn">then</span>(r => r.<span class="fn">json</span>());
+
+  <span class="kw">const</span> { summary } = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">"/api/summarize-card"</span>, {
+    body: <span class="fn">JSON.stringify</span>({ data }),
+  }).<span class="fn">then</span>(r => r.<span class="fn">json</span>());
+
+  <span class="fn">setFields</span>({ name: data[<span class="str">"氏名"</span>], engineerType: data[<span class="str">"エンジニアタイプ"</span>],
+              catchphrase: data[<span class="str">"キャッチフレーズ"</span>], skills: data[<span class="str">"主戦場スキル"</span>],
+              summary, ... });
+}
+
+<span class="cm">// Phase 3: クライアントで PPTX 生成（サーバー不使用）</span>
+<span class="kw">async function</span> <span class="fn">handleDownloadPptx</span>() {
+  <span class="kw">const</span> { generatePptx } = <span class="kw">await import</span>(<span class="str">"./lib/generatePptx"</span>);  <span class="cm">// 遅延ロード</span>
+  <span class="fn">generatePptx</span>(rawData);  <span class="cm">// ブラウザ内で .pptx を組み立ててダウンロード</span>
+}
+
+<span class="kw">async function</span> <span class="fn">handleDownloadCard</span>() {
+  <span class="kw">const</span> { generateCardPptx } = <span class="kw">await import</span>(<span class="str">"./lib/generatePptx"</span>);
+  <span class="fn">generateCardPptx</span>(fields, theme);
+}</pre>
+    </div>
+  </section>
+
+  <!-- ── Gotchas ── -->
+  <section class="section" id="gotchas">
+    <h2>pptxgenjs の落とし穴</h2>
+    <div class="gotcha-list">
+      <div class="gotcha-item">
+        <div class="gotcha-title">テキストボックスのデフォルト垂直揃えは中央（anchor = "ctr"）</div>
+        <div class="gotcha-body">pptxgenjs ソース line 2581: <code>anchor = TEXT_VALIGN.ctr</code>。テキストボックスを大きくすると内部でテキストが中央に配置され、上に余白ができる。<code>valign: "top"</code> を明示することで <code>anchor="t"</code> に上書きされる。それでも余白が出る場合は複数ボックスを1つに統合して根本解決する。</div>
+      </div>
+      <div class="gotcha-item">
+        <div class="gotcha-title">margin vs inset — 内部余白の指定</div>
+        <div class="gotcha-body"><code>inset: 0</code> は <code>lIns / tIns / bIns</code> をゼロにするが <code>rIns</code> は変わらない。<code>margin: 0</code> を使うと4辺すべてが <code>valToPts(0)</code> でゼロになる。Y 座標をテキスト先頭に正確に合わせたい場合は <code>margin: 0</code> が正解。</div>
+      </div>
+      <div class="gotcha-item">
+        <div class="gotcha-title">shrinkText / fit:"shrink" は信頼できない</div>
+        <div class="gotcha-body">どちらも OOXML の <code>&lt;a:normAutofit/&gt;</code> を挿入するが、PowerPoint/LibreOffice のレンダリング依存で動作が不安定。JS 側で <code>fitText()</code> を実装して文字数を計算し、超過分を <code>…</code> に切り詰めるほうが確実。</div>
+      </div>
+      <div class="gotcha-item">
+        <div class="gotcha-title">日本語と英数字が混在するとフォントが混在する</div>
+        <div class="gotcha-body">pptxgenjs はデフォルトで Latin 文字に Calibri、CJK に別フォントを適用する。バッジの「案件 1」のように混在するとサイズ感がずれる。<code>fontFace: "Meiryo UI"</code> を明示することで統一される。</div>
+      </div>
+      <div class="gotcha-item">
+        <div class="gotcha-title">ブラウザキャッシュで generatePptx が古いままになる</div>
+        <div class="gotcha-body"><code>dynamic import()</code> でロードされるモジュールは初回アクセス後にブラウザにキャッシュされる。コードを変更しても反映されない場合は <kbd>Ctrl+Shift+R</kbd>（ハードリロード）で解消する。開発中は <code>next dev</code> のホットリロードが効かないケースがある。</div>
+      </div>
+      <div class="gotcha-item">
+        <div class="gotcha-title">rectRadius は pptxgenjs の独自拡張（インチ単位）</div>
+        <div class="gotcha-body">OOXML の <code>custGeom</code> を内部で生成する。単位はインチ。<code>0.05</code> 程度が視覚的に自然な角丸になる。</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  // Scroll spy for sidebar nav
+  const anchors = ['overview-section','flow','stack','structure','env','sheet',
+    'api-sheet','api-summarize','pptx-profile','pptx-card','page','gotchas'];
+  const navLinks = document.querySelectorAll('.nav a');
+
+  function updateNav() {
+    let current = anchors[0];
+    for (const id of anchors) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      if (el.getBoundingClientRect().top <= 80) current = id;
+    }
+    navLinks.forEach(a => {
+      const href = a.getAttribute('href').slice(1);
+      a.classList.toggle('active', href === current);
+    });
+  }
+  window.addEventListener('scroll', updateNav, { passive: true });
+  updateNav();
+</script>
