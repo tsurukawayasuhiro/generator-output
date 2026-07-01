@@ -178,19 +178,19 @@ export function generatePptx(data: EngineerData): void {
 
     slide.addShape(pptx.ShapeType.rect, { x:RX, y:py, w:RW, h:projH, fill:{color:C.white}, line:{color:C.border, width:0.75}, rectRadius:0.05 });
 
-    // 案件バッジ — w=0.68in で "案件10" まで確実に1行
+    // 案件バッジ — fontFace指定で漢字と数字を同一フォントに統一
     slide.addShape(pptx.ShapeType.rect, { x:RX+0.1, y:py+0.1, w:0.68, h:0.28, fill:{color:C.bluePale}, line:{color:C.blueBorder, width:0.75}, rectRadius:0.03 });
-    slide.addText(`案件 ${i+1}`, { x:RX+0.1, y:py+0.1, w:0.68, h:0.28, fontSize:9, bold:true, color:C.blue, align:"center", valign:"middle" });
+    slide.addText(`案件 ${i+1}`, { x:RX+0.1, y:py+0.1, w:0.68, h:0.28, fontSize:9, bold:true, color:C.blue, fontFace:"Meiryo UI", align:"center", valign:"middle" });
 
-    // カード内の固定ゾーン配置（タイトル高さは行数から動的計算）
-    // 日本語13ptの実幅は0.181in/char
+    // カード内の配置 — margin:0 でOOXMLデフォルト内部余白(0.064in×2)を除去
+    // これにより y座標がそのままテキスト先頭になる
+    const MARGIN = 0;
     const titleCharsPerLine = Math.max(1, Math.floor((projW - 0.84) / (13 / 72)));
     const titleLines = Math.min(Math.ceil(p.overview.length / titleCharsPerLine), 3);
-    // 1行 = 13pt/72 * lineSpacing。内部パディングは含まず、タイトル直後にmetaを詰める
-    const TITLE_H = titleLines * (13 / 72) * 1.2 + 0.03;
-    const META_H  = 0.24;
+    const TITLE_H = titleLines * (13 / 72) * 1.2 + 0.04;
+    const META_H  = 0.20;  // 10pt × 1行 = 0.139in + 少し余裕
     const RES_H   = p.result ? 0.30 : 0;
-    const GAP     = 0.04;
+    const GAP     = 0.06;  // margin:0 の分、目で見た余白としてGAPで調整
     const meta    = [p.role && `役割: ${p.role}`, (p.period||p.scale) && [p.period,p.scale].filter(Boolean).join(" | ")].filter(Boolean).join("　");
     const extras  = p.extra.slice(0, 2);
 
@@ -199,15 +199,18 @@ export function generatePptx(data: EngineerData): void {
     const extraY      = metaY + (meta ? META_H + GAP : 0);
     const extraBottom = py + projH - RES_H - (RES_H > 0 ? GAP : 0.04);
 
-    // 概要（タイトル）— valign:top + inset:0 でボックス上部余白をなくす
+    // 概要（タイトル）
     slide.addText(fitText(p.overview, projW-0.84, TITLE_H, 13, 1.2, true), {
-      x:RX+0.84, y:titleY, w:projW-0.84, h:TITLE_H, fontSize:13, bold:true, color:C.navy, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.2, valign:"top", inset:0,
+      x:RX+0.84, y:titleY, w:projW-0.84, h:TITLE_H,
+      fontSize:13, bold:true, color:C.navy, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.2,
+      valign:"top", margin:MARGIN,
     });
 
     // 役割・期間・規模
     if (meta) {
       slide.addText(fitText(meta, projW-0.84, META_H, 10), {
-        x:RX+0.84, y:metaY, w:projW-0.84, h:META_H, fontSize:10, color:C.slate, fontFace:"Meiryo UI", valign:"top", inset:0,
+        x:RX+0.84, y:metaY, w:projW-0.84, h:META_H,
+        fontSize:10, color:C.slate, fontFace:"Meiryo UI", valign:"top", margin:MARGIN,
       });
     }
 
@@ -218,7 +221,9 @@ export function generatePptx(data: EngineerData): void {
         const ey = extraY + ei * (eH + GAP * 0.5);
         if (ey + 0.15 > extraBottom) return;
         slide.addText(fitText(`${label}: ${value}`, projW-0.84, eH, 10, 1.3), {
-          x:RX+0.84, y:ey, w:projW-0.84, h:eH, fontSize:10, color:C.slate, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3, valign:"top", inset:0,
+          x:RX+0.84, y:ey, w:projW-0.84, h:eH,
+          fontSize:10, color:C.slate, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3,
+          valign:"top", margin:MARGIN,
         });
       });
     }
