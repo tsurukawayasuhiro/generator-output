@@ -178,17 +178,18 @@ export function generatePptx(data: EngineerData): void {
 
     slide.addShape(pptx.ShapeType.rect, { x:RX, y:py, w:RW, h:projH, fill:{color:C.white}, line:{color:C.border, width:0.75}, rectRadius:0.05 });
 
-    // 案件バッジ（左上固定）
-    slide.addShape(pptx.ShapeType.rect, { x:RX+0.12, y:py+0.14, w:0.5, h:0.26, fill:{color:C.bluePale}, line:{color:C.blueBorder, width:0.75}, rectRadius:0.03 });
-    slide.addText(`案件 ${i+1}`, { x:RX+0.12, y:py+0.14, w:0.5, h:0.26, fontSize:9, bold:true, color:C.blue, align:"center", valign:"middle" });
+    // 案件バッジ（左上固定）— スペースなし "案件1" で改行を防ぐ
+    slide.addShape(pptx.ShapeType.rect, { x:RX+0.12, y:py+0.12, w:0.54, h:0.26, fill:{color:C.bluePale}, line:{color:C.blueBorder, width:0.75}, rectRadius:0.03 });
+    slide.addText(`案件${i+1}`, { x:RX+0.12, y:py+0.12, w:0.54, h:0.26, fontSize:9, bold:true, color:C.blue, align:"center", valign:"middle" });
 
     // カード内の固定ゾーン配置（タイトル高さは行数から動的計算）
-    const titleCharsPerLine = Math.max(1, Math.floor((projW - 0.7) / ((13 * 0.65) / 72)));
+    // 日本語13ptの実幅は0.181in/char。スペースなし推定でcharsPerLineを算出
+    const titleCharsPerLine = Math.max(1, Math.floor((projW - 0.7) / (13 / 72)));
     const titleLines = Math.min(Math.ceil(p.overview.length / titleCharsPerLine), 3);
-    const TITLE_H = titleLines * ((13 / 72) * 1.25 * 1.18) + 0.06; // 行数×1行高さ+余白
-    const META_H  = 0.28;  // 役割・規模 高さ: 10pt × 1行
+    const TITLE_H = titleLines * (13 / 72) * 1.25 + 0.05; // ぴったりサイズ+5pt余白のみ
+    const META_H  = 0.26;
     const RES_H   = p.result ? 0.32 : 0;
-    const GAP     = 0.06;
+    const GAP     = 0.05;
     const meta    = [p.role && `役割: ${p.role}`, (p.period||p.scale) && [p.period,p.scale].filter(Boolean).join(" | ")].filter(Boolean).join("　");
     const extras  = p.extra.slice(0, 2);
 
