@@ -46,6 +46,29 @@ const RW  = 10.4; // 右エリア幅
 const SW  = 13.33;
 const SH  = 7.5;
 
+/**
+ * テキストを高さ・幅・フォントサイズに基づいて切り詰める。
+ * pptxgenjsは<a:normAutofit/>の自動縮小を確実に適用しないため、
+ * JS側で切り詰めることで重なりを防ぐ。
+ * @param text 元テキスト
+ * @param wIn  テキストボックス幅（inch）
+ * @param hIn  テキストボックス高さ（inch）
+ * @param fontSize フォントサイズ（pt）
+ * @param lineSpacing 行間倍率（デフォルト1.3）
+ * @param isBold 太字かどうか（太字は文字幅が若干広い）
+ */
+function fitText(text: string, wIn: number, hIn: number, fontSize: number, lineSpacing = 1.3, isBold = false): string {
+  // 1文字あたりの幅（inch）: 日本語/太字は広め
+  const charW = (fontSize * (isBold ? 0.65 : 0.58)) / 72;
+  // 1行あたりの高さ（inch）
+  const lineH = (fontSize / 72) * lineSpacing * 1.15; // 1.15はpptxgenjs内部余白補正
+  const charsPerLine = Math.max(1, Math.floor(wIn / charW));
+  const maxLines     = Math.max(1, Math.floor(hIn / lineH));
+  const maxChars     = charsPerLine * maxLines;
+  if (text.length <= maxChars) return text;
+  return text.slice(0, maxChars - 1) + "…";
+}
+
 export function generatePptx(data: EngineerData): void {
   const pptx = new PptxGenJS();
   pptx.layout = "LAYOUT_WIDE";
@@ -91,9 +114,12 @@ export function generatePptx(data: EngineerData): void {
   const fieldEnd   = SH - 0.44;
   const slotH      = leftFields.length > 0 ? (fieldEnd - fieldStart) / leftFields.length : 1.2;
   leftFields.forEach(([label, val], fi) => {
-    const fy = fieldStart + fi * slotH;
-    slide.addText(label, { x:0.22, y:fy,        w:LW-0.3, h:0.22, fontSize:9,  bold:true, color:"7AAED4", charSpacing:1.5 });
-    slide.addText(val,   { x:0.22, y:fy+0.25,   w:LW-0.3, h:slotH-0.35, fontSize:10, color:"D4E8F8", fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3, shrinkText:true });
+    const fy   = fieldStart + fi * slotH;
+    const valH = slotH - 0.3;
+    slide.addText(label, { x:0.22, y:fy,       w:LW-0.3, h:0.24, fontSize:9, bold:true, color:"7AAED4", charSpacing:1.5 });
+    slide.addText(fitText(val, LW-0.34, valH, 10, 1.3), {
+      x:0.22, y:fy+0.26, w:LW-0.3, h:valH, fontSize:10, color:"D4E8F8", fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3,
+    });
   });
 
   // フッター
@@ -141,34 +167,50 @@ export function generatePptx(data: EngineerData): void {
     slide.addShape(pptx.ShapeType.rect, { x:RX+0.12, y:py+0.14, w:0.5, h:0.26, fill:{color:C.bluePale}, line:{color:C.blueBorder, width:0.75}, rectRadius:0.03 });
     slide.addText(`案件 ${i+1}`, { x:RX+0.12, y:py+0.14, w:0.5, h:0.26, fontSize:9, bold:true, color:C.blue, align:"center", valign:"middle" });
 
-    // カード内の縦領域を比率で分割（概要45%、詳細40%、成果15%）
-    const overviewH = projH * 0.45;
-    const detailY   = py + overviewH + 0.06;
+    // カード内の固定ゾーン配置
+    const TITLE_H = 0.46;  // 概要（タイトル）高さ: 13pt × 2行
+    const META_H  = 0.28;  // 役割・規模 高さ: 10pt × 1行
+    const RES_H   = p.result ? 0.32 : 0;
+    const GAP     = 0.06;
+    const meta    = [p.role && `役割: ${p.role}`, (p.period||p.scale) && [p.period,p.scale].filter(Boolean).join(" | ")].filter(Boolean).join("　");
+    const extras  = p.extra.slice(0, 2);
 
-    // 概要（タイトル）— shrinkTextで長文でもボックス内に収まる
-    slide.addText(p.overview, { x:RX+0.68, y:py+0.1, w:projW-0.68, h:overviewH-0.1, fontSize:13, bold:true, color:C.navy, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.25, shrinkText:true });
+    const titleY      = py + 0.1;
+    const metaY       = titleY + TITLE_H + GAP;
+    const extraY      = metaY + (meta ? META_H + GAP : 0);
+    const extraBottom = py + projH - RES_H - (RES_H > 0 ? GAP : 0.04);
+
+    // 概要（タイトル）
+    slide.addText(fitText(p.overview, projW-0.7, TITLE_H, 13, 1.25, true), {
+      x:RX+0.68, y:titleY, w:projW-0.68, h:TITLE_H, fontSize:13, bold:true, color:C.navy, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.25,
+    });
 
     // 役割・期間・規模
-    const meta = [p.role && `役割: ${p.role}`, (p.period||p.scale) && [p.period,p.scale].filter(Boolean).join(" | ")].filter(Boolean).join("　");
-    let curY = detailY;
     if (meta) {
-      slide.addText(meta, { x:RX+0.68, y:curY, w:projW-0.68, h:0.26, fontSize:10, color:C.slate, fontFace:"Meiryo UI", shrinkText:true });
-      curY += 0.28;
+      slide.addText(fitText(meta, projW-0.7, META_H, 10), {
+        x:RX+0.68, y:metaY, w:projW-0.68, h:META_H, fontSize:10, color:C.slate, fontFace:"Meiryo UI",
+      });
     }
 
-    // extra フィールド（スペースが許す範囲内のみ）
-    const resultReserve = p.result ? 0.34 : 0.0;
-    p.extra.slice(0, 2).forEach(({ label, value }) => {
-      if (curY + 0.26 > py + projH - resultReserve - 0.06) return;
-      slide.addText(`${label}: ${value}`, { x:RX+0.68, y:curY, w:projW-0.68, h:0.26, fontSize:10, color:C.slate, fontFace:"Meiryo UI", shrinkText:true });
-      curY += 0.28;
-    });
+    // extra フィールド（残り高さを均等分割）
+    if (extras.length > 0) {
+      const eH = Math.max(0.2, (extraBottom - extraY) / extras.length - GAP * 0.5);
+      extras.forEach(({ label, value }, ei) => {
+        const ey = extraY + ei * (eH + GAP * 0.5);
+        if (ey + 0.15 > extraBottom) return;
+        slide.addText(fitText(`${label}: ${value}`, projW-0.7, eH, 10, 1.3), {
+          x:RX+0.68, y:ey, w:projW-0.68, h:eH, fontSize:10, color:C.slate, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3,
+        });
+      });
+    }
 
     // 成果（カード下部に固定）
     if (p.result) {
-      const ry = py + projH - 0.32;
+      const ry = py + projH - RES_H;
       slide.addShape(pptx.ShapeType.rect, { x:RX+0.68, y:ry, w:projW-0.74, h:0.26, fill:{color:C.greenPale}, line:{color:C.greenBorder, width:0.75}, rectRadius:0.03 });
-      slide.addText(`成果: ${p.result}`, { x:RX+0.78, y:ry+0.02, w:projW-0.94, h:0.24, fontSize:10, color:C.green, fontFace:"Meiryo UI", shrinkText:true });
+      slide.addText(fitText(`成果: ${p.result}`, projW-0.96, 0.24, 10), {
+        x:RX+0.78, y:ry+0.03, w:projW-0.96, h:0.24, fontSize:10, color:C.green, fontFace:"Meiryo UI",
+      });
     }
 
     // 技術スタック（右側）
