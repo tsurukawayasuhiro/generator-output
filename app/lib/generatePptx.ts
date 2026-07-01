@@ -187,10 +187,10 @@ export function generatePptx(data: EngineerData): void {
     const MARGIN = 0;
     const titleCharsPerLine = Math.max(1, Math.floor((projW - 0.84) / (13 / 72)));
     const titleLines = Math.min(Math.ceil(p.overview.length / titleCharsPerLine), 3);
-    const TITLE_H = titleLines * (13 / 72) * 1.2 + 0.04;
-    const META_H  = 0.20;  // 10pt × 1行 = 0.139in + 少し余裕
+    const TITLE_H = titleLines * (13 / 72) * 1.2 + 0.02;
+    const META_H  = 0.16;  // 10pt = 0.139in、ほぼぴったり
     const RES_H   = p.result ? 0.30 : 0;
-    const GAP     = 0.06;  // margin:0 の分、目で見た余白としてGAPで調整
+    const GAP     = 0.04;
     const meta    = [p.role && `役割: ${p.role}`, (p.period||p.scale) && [p.period,p.scale].filter(Boolean).join(" | ")].filter(Boolean).join("　");
     const extras  = p.extra.slice(0, 2);
 
