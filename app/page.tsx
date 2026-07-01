@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import EngineerCard, { CARD_THEMES, type CardFields, type ThemeId } from "./components/EngineerCard";
 import EngineerProfile from "./components/EngineerProfile";
 
-type Phase = "idle" | "loading" | "summarizing" | "done";
+type Phase = "idle" | "fetching-sheets" | "loading" | "summarizing" | "done";
 type Tab = "card" | "profile";
 
 export default function Home() {
@@ -21,10 +21,9 @@ export default function Home() {
   const [theme, setTheme] = useState<ThemeId>("white");
   const [rawData, setRawData] = useState<Record<string, string>>({});
 
-  const cardRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
   const profileWrapRef = useRef<HTMLDivElement>(null);
-  const isLoading = phase === "loading" || phase === "summarizing";
+  const isLoading = phase === "fetching-sheets" || phase === "loading" || phase === "summarizing";
 
   // 16:9プレビューのスケール計算
   useEffect(() => {
@@ -44,9 +43,29 @@ export default function Home() {
     return () => window.removeEventListener("resize", updateScale);
   }, [tab, phase]);
 
+  async function handleFetchSheets() {
+    if (!spreadsheetId.trim()) { setError("スプレッドシート ID を入力してください"); return; }
+    setError(""); setPhase("fetching-sheets");
+    try {
+      const res = await fetch("/api/read-sheet", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spreadsheetId: spreadsheetId.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "読み込みに失敗しました");
+      const names: string[] = json.sheetNames ?? [];
+      setSheetNames(names);
+      setSheetName(names[0] ?? "");
+      setPhase("idle");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "エラーが発生しました");
+      setPhase("idle");
+    }
+  }
+
   async function handleLoad() {
     if (!spreadsheetId.trim()) { setError("スプレッドシート ID を入力してください"); return; }
-    if (!sheetName.trim()) { setError("氏名（タブ名）を入力してください"); return; }
+    if (!sheetName.trim()) { setError("シートを選択してください"); return; }
     setError(""); setPhase("loading");
     try {
       const res = await fetch("/api/read-sheet", {
@@ -55,7 +74,6 @@ export default function Home() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "読み込みに失敗しました");
-      setSheetNames(json.sheetNames ?? []);
       const data: Record<string, string> = json.data ?? {};
       setRawData(data);
       setFields({
@@ -99,28 +117,10 @@ export default function Home() {
   }
 
   async function handleDownloadCard() {
-    if (!cardRef.current) return;
-    const html2canvas = (await import("html2canvas")).default;
-    const canvas = await html2canvas(cardRef.current, { scale: 3, useCORS: true, backgroundColor: null });
-    const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
-    a.download = `${fields.name || "profile"}_card.png`;
-    a.click();
+    const { generateCardPptx } = await import("./lib/generatePptx");
+    generateCardPptx(fields, theme);
   }
 
-  async function handleDownloadProfile() {
-    if (!profileRef.current) return;
-    const html2canvas = (await import("html2canvas")).default;
-    // スケールを1に戻して実寸でキャプチャ
-    profileRef.current.style.setProperty("--profile-scale", "1");
-    const canvas = await html2canvas(profileRef.current, { scale: 2, useCORS: true, width: 960, height: 540 });
-    profileRef.current.style.setProperty("--profile-scale",
-      String((profileWrapRef.current?.clientWidth ?? 960) / 960));
-    const a = document.createElement("a");
-    a.href = canvas.toDataURL("image/png");
-    a.download = `${fields.name || "profile"}_profile.png`;
-    a.click();
-  }
 
   async function handleDownloadPptx() {
     if (!Object.keys(rawData).length) return;
@@ -149,31 +149,44 @@ export default function Home() {
             <span className="text-xs font-bold tracking-widest uppercase text-[#4A5F78]">データ読み込み</span>
           </div>
           <div className="p-5 flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#4A5F78] uppercase tracking-wide">スプレッドシート ID</label>
-              <input
-                type="text"
-                placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
-                value={spreadsheetId}
-                onChange={(e) => setSpreadsheetId(e.target.value)}
-                className="border border-[#D4DDE8] rounded-lg px-3 py-2 text-sm text-[#0F2744] placeholder:text-[#B0BEC8] focus:outline-none focus:ring-2 focus:ring-[#0057B8]/30 focus:border-[#0057B8]"
-              />
+            <div className="flex gap-3 items-end">
+              <div className="flex flex-col gap-1.5 flex-1">
+                <label className="text-xs font-semibold text-[#4A5F78] uppercase tracking-wide">スプレッドシート ID</label>
+                <input
+                  type="text"
+                  placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms"
+                  value={spreadsheetId}
+                  onChange={(e) => { setSpreadsheetId(e.target.value); setSheetNames([]); setSheetName(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleFetchSheets()}
+                  className="border border-[#D4DDE8] rounded-lg px-3 py-2 text-sm text-[#0F2744] placeholder:text-[#B0BEC8] focus:outline-none focus:ring-2 focus:ring-[#0057B8]/30 focus:border-[#0057B8]"
+                />
+              </div>
+              <button onClick={handleFetchSheets} disabled={isLoading}
+                className="bg-[#4A5F78] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#374a5e] disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap">
+                {phase === "fetching-sheets" ? "取得中…" : "シート一覧を取得"}
+              </button>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-[#4A5F78] uppercase tracking-wide">氏名（タブ名）</label>
-              <input
-                type="text"
-                placeholder="田中 誠一"
-                value={sheetName}
-                onChange={(e) => setSheetName(e.target.value)}
-                className="border border-[#D4DDE8] rounded-lg px-3 py-2 text-sm text-[#0F2744] placeholder:text-[#B0BEC8] focus:outline-none focus:ring-2 focus:ring-[#0057B8]/30 focus:border-[#0057B8]"
-              />
-            </div>
+            {sheetNames.length > 0 && (
+              <div className="flex gap-3 items-end">
+                <div className="flex flex-col gap-1.5 flex-1">
+                  <label className="text-xs font-semibold text-[#4A5F78] uppercase tracking-wide">対象シート（氏名）</label>
+                  <select
+                    value={sheetName}
+                    onChange={(e) => setSheetName(e.target.value)}
+                    className="border border-[#D4DDE8] rounded-lg px-3 py-2 text-sm text-[#0F2744] focus:outline-none focus:ring-2 focus:ring-[#0057B8]/30 focus:border-[#0057B8] bg-white"
+                  >
+                    {sheetNames.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+                <button onClick={handleLoad} disabled={isLoading}
+                  className="bg-[#0057B8] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#0046A0] disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap">
+                  {phase === "loading" ? "読み込み中…" : phase === "summarizing" ? "AI 要約生成中…" : "読み込む"}
+                </button>
+              </div>
+            )}
             {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
-            <button onClick={handleLoad} disabled={isLoading}
-              className="self-start bg-[#0057B8] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#0046A0] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-              {phase === "loading" ? "読み込み中…" : phase === "summarizing" ? "AI 要約生成中…" : "読み込む"}
-            </button>
           </div>
         </section>
 
@@ -213,8 +226,8 @@ export default function Home() {
                     </button>
                     {hasDone && (
                       <button onClick={handleDownloadCard}
-                        className="bg-[#0057B8] text-white text-sm font-semibold px-4 py-1.5 rounded-lg hover:bg-[#0046A0] transition-colors">
-                        PNG ダウンロード
+                        className="bg-[#D97706] text-white text-sm font-semibold px-4 py-1.5 rounded-lg hover:bg-[#B45309] transition-colors">
+                        .pptx ダウンロード
                       </button>
                     )}
                   </div>
@@ -223,7 +236,7 @@ export default function Home() {
                 <div className="flex justify-center py-4">
                   {phase === "summarizing"
                     ? <div className="text-sm text-[#7A90A8] animate-pulse py-16">AI が紹介文を生成しています…</div>
-                    : <EngineerCard ref={cardRef} fields={fields} theme={theme} editable onChange={setFields} />
+                    : <EngineerCard fields={fields} theme={theme} editable onChange={setFields} />
                   }
                 </div>
               </div>
@@ -233,10 +246,6 @@ export default function Home() {
             {tab === "profile" && (
               <div className="p-5 flex flex-col gap-4">
                 <div className="flex justify-end gap-2">
-                  <button onClick={handleDownloadProfile}
-                    className="border border-[#D4DDE8] text-[#4A5F78] text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-[#F5F8FC] transition-colors">
-                    PNG ダウンロード
-                  </button>
                   <button onClick={handleDownloadPptx}
                     className="bg-[#D97706] text-white text-sm font-semibold px-4 py-1.5 rounded-lg hover:bg-[#B45309] transition-colors">
                     .pptx ダウンロード

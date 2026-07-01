@@ -188,16 +188,13 @@ export function generatePptx(data: EngineerData): void {
     const titleCharsPerLine = Math.max(1, Math.floor((projW - 0.84) / (13 / 72)));
     const titleLines = Math.min(Math.ceil(p.overview.length / titleCharsPerLine), 3);
     const TITLE_H = titleLines * (13 / 72) * 1.2 + 0.02;
-    const META_H  = 0.16;  // 10pt = 0.139in、ほぼぴったり
     const RES_H   = p.result ? 0.30 : 0;
-    const GAP     = 0.04;
     const meta    = [p.role && `役割: ${p.role}`, (p.period||p.scale) && [p.period,p.scale].filter(Boolean).join(" | ")].filter(Boolean).join("　");
     const extras  = p.extra.slice(0, 2);
 
-    const titleY      = py + 0.1;
-    const metaY       = titleY + TITLE_H + GAP;
-    const extraY      = metaY + (meta ? META_H + GAP : 0);
-    const extraBottom = py + projH - RES_H - (RES_H > 0 ? GAP : 0.04);
+    const titleY   = py + 0.08;
+    const detailY  = titleY + TITLE_H + 0.04;
+    const detailH  = projH - (detailY - py) - RES_H - 0.04;
 
     // 概要（タイトル）
     slide.addText(fitText(p.overview, projW-0.84, TITLE_H, 13, 1.2, true), {
@@ -206,25 +203,17 @@ export function generatePptx(data: EngineerData): void {
       valign:"top", margin:MARGIN,
     });
 
-    // 役割・期間・規模
-    if (meta) {
-      slide.addText(fitText(meta, projW-0.84, META_H, 10), {
-        x:RX+0.84, y:metaY, w:projW-0.84, h:META_H,
-        fontSize:10, color:C.slate, fontFace:"Meiryo UI", valign:"top", margin:MARGIN,
-      });
-    }
-
-    // extra フィールド（残り高さを均等分割）
-    if (extras.length > 0) {
-      const eH = Math.max(0.2, (extraBottom - extraY) / extras.length - GAP * 0.5);
-      extras.forEach(({ label, value }, ei) => {
-        const ey = extraY + ei * (eH + GAP * 0.5);
-        if (ey + 0.15 > extraBottom) return;
-        slide.addText(fitText(`${label}: ${value}`, projW-0.84, eH, 10, 1.3), {
-          x:RX+0.84, y:ey, w:projW-0.84, h:eH,
-          fontSize:10, color:C.slate, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.3,
-          valign:"top", margin:MARGIN,
-        });
+    // 詳細テキスト（meta + extra を1ボックスに統合 — 分割すると anchor:ctr で余白が生まれる）
+    const detailLines = [
+      ...(meta ? [meta] : []),
+      ...extras.map(({ label, value }) => `${label}: ${value}`),
+    ];
+    if (detailLines.length > 0) {
+      const detailText = detailLines.join("\n");
+      slide.addText(fitText(detailText, projW-0.84, detailH, 10, 1.4), {
+        x:RX+0.84, y:detailY, w:projW-0.84, h:detailH,
+        fontSize:10, color:C.slate, fontFace:"Meiryo UI", wrap:true, lineSpacingMultiple:1.4,
+        valign:"top", margin:MARGIN,
       });
     }
 
@@ -270,4 +259,145 @@ export function generatePptx(data: EngineerData): void {
   slide.addText(month, { x:SW-2.2, y:SH-0.26, w:2.0, h:0.22, fontSize:9, color:C.muted, align:"right" });
 
   pptx.writeFile({ fileName: `${data["氏名"] ?? "profile"}_profile.pptx` });
+}
+
+// カードテーマ（EngineerCard.tsx と同値）
+const CARD_THEMES_PPTX = [
+  { id: "white",  avatarBg: "F2F0EB", avatarText: "A89F90", cardBg: "FFFFFF",  border: "E4E0D8" },
+  { id: "slate",  avatarBg: "DDE4ED", avatarText: "8A9DB5", cardBg: "F8FAFD",  border: "CDD7E4" },
+  { id: "sage",   avatarBg: "DDE8E1", avatarText: "8AAD95", cardBg: "F7FBF8",  border: "C8DDD0" },
+  { id: "rose",   avatarBg: "EDE0E0", avatarText: "B59090", cardBg: "FDF8F8",  border: "E0CCCC" },
+  { id: "indigo", avatarBg: "E0E0ED", avatarText: "9090B5", cardBg: "F8F8FD",  border: "CCCCE0" },
+] as const;
+
+export function generateCardPptx(
+  fields: { name: string; engineerType: string; catchphrase: string; summary: string; skills: string },
+  themeId: string = "white"
+) {
+  const theme = CARD_THEMES_PPTX.find((t) => t.id === themeId) ?? CARD_THEMES_PPTX[0];
+
+  const pptx = new PptxGenJS();
+  pptx.layout = "LAYOUT_WIDE"; // 13.33 × 7.5 in
+
+  // カードサイズ・位置
+  const CW = 3.2;   // カード幅
+  const CH = 5.0;   // カード高さ
+  const CX = (SW - CW) / 2;
+  const CY = (SH - CH) / 2;
+  const AVH = 1.1;  // アバターエリア高さ
+  const R = 0.08;   // 角丸
+
+  const slide = pptx.addSlide();
+  slide.background = { color: C.bg };
+
+  // カード外枠
+  slide.addShape(pptx.ShapeType.rect, {
+    x: CX, y: CY, w: CW, h: CH,
+    fill: { color: theme.cardBg },
+    line: { color: theme.border, width: 1 },
+    rectRadius: R,
+  });
+
+  // アバターエリア背景
+  slide.addShape(pptx.ShapeType.rect, {
+    x: CX, y: CY, w: CW, h: AVH,
+    fill: { color: theme.avatarBg },
+    line: { color: theme.border, width: 0 },
+    rectRadius: R,
+  });
+  // アバターエリア下部を角丸なしで上書き（下半分を覆う）
+  slide.addShape(pptx.ShapeType.rect, {
+    x: CX, y: CY + AVH * 0.5, w: CW, h: AVH * 0.5,
+    fill: { color: theme.avatarBg },
+    line: { color: "FFFFFF", width: 0 },
+  });
+  // アバターエリア下境界線
+  slide.addShape(pptx.ShapeType.line, {
+    x: CX, y: CY + AVH, w: CW, h: 0,
+    line: { color: theme.border, width: 0.75 },
+  });
+
+  // イニシャル円
+  const initials = fields.name.split(/\s+/).map((s) => s[0]).join("").slice(0, 2) || "　";
+  const circleSize = 0.64;
+  const circleX = CX + (CW - circleSize) / 2;
+  const circleY = CY + (AVH - circleSize) / 2;
+  slide.addShape(pptx.ShapeType.ellipse, {
+    x: circleX, y: circleY, w: circleSize, h: circleSize,
+    fill: { color: "FFFFFF", transparency: 40 },
+    line: { color: theme.border, width: 0 },
+  });
+  slide.addText(initials, {
+    x: circleX, y: circleY, w: circleSize, h: circleSize,
+    fontSize: 18, bold: true, color: theme.avatarText,
+    align: "center", valign: "middle", fontFace: "Meiryo UI",
+  });
+
+  // 本文エリア
+  const BX = CX + 0.18;
+  const BW = CW - 0.36;
+  let BY = CY + AVH + 0.16;
+
+  // エンジニアタイプ
+  if (fields.engineerType) {
+    const typeText = fields.engineerType.split(/[,、]/).map((s) => s.trim()).filter(Boolean).join(" / ");
+    slide.addText(typeText, {
+      x: BX, y: BY, w: BW, h: 0.2,
+      fontSize: 10, color: C.muted, fontFace: "Meiryo UI",
+    });
+    BY += 0.24;
+  }
+
+  // キャッチフレーズ
+  if (fields.catchphrase) {
+    const cpLines = Math.min(Math.ceil(fields.catchphrase.length / Math.floor(BW / (10.5 / 72 * 0.6))), 3);
+    const cpH = cpLines * (10.5 / 72) * 1.5 + 0.04;
+    slide.addText(fitText(fields.catchphrase, BW, cpH, 10.5, 1.5), {
+      x: BX, y: BY, w: BW, h: cpH,
+      fontSize: 10.5, color: "666666", fontFace: "Meiryo UI", wrap: true, lineSpacingMultiple: 1.5,
+      valign: "top", margin: 0,
+    });
+    BY += cpH + 0.1;
+  }
+
+  // 区切り線
+  slide.addShape(pptx.ShapeType.line, {
+    x: BX, y: BY, w: BW, h: 0,
+    line: { color: theme.border, width: 0.75 },
+  });
+  BY += 0.12;
+
+  // 紹介文
+  if (fields.summary) {
+    const sumBottom = CY + CH - (fields.skills ? 0.9 : 0.18);
+    const sumH = Math.max(0.3, sumBottom - BY);
+    slide.addText(fitText(fields.summary, BW, sumH, 10.5, 1.75), {
+      x: BX, y: BY, w: BW, h: sumH,
+      fontSize: 10.5, color: "444444", fontFace: "Meiryo UI", wrap: true, lineSpacingMultiple: 1.75,
+      valign: "top", margin: 0,
+    });
+    BY += sumH + 0.08;
+  }
+
+  // スキル
+  if (fields.skills) {
+    slide.addShape(pptx.ShapeType.line, {
+      x: BX, y: BY, w: BW, h: 0,
+      line: { color: theme.border, width: 0.75 },
+    });
+    BY += 0.1;
+    slide.addText("スキル", {
+      x: BX, y: BY, w: BW, h: 0.16,
+      fontSize: 9, bold: true, color: C.muted, fontFace: "Meiryo UI", charSpacing: 1,
+    });
+    BY += 0.2;
+    const skillH = Math.max(0.2, CY + CH - BY - 0.1);
+    slide.addText(fitText(fields.skills, BW, skillH, 10, 1.6), {
+      x: BX, y: BY, w: BW, h: skillH,
+      fontSize: 10, color: "555555", fontFace: "Meiryo UI", wrap: true, lineSpacingMultiple: 1.6,
+      valign: "top", margin: 0,
+    });
+  }
+
+  pptx.writeFile({ fileName: `${fields.name || "card"}_card.pptx` });
 }
