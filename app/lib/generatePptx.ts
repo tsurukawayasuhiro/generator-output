@@ -116,16 +116,22 @@ export function generatePptx(data: EngineerData): void {
   }
 
   // ② 代表案件（縦並び）
-  const projAreaH = projs.length === 0 ? 0.6 : Math.min(projs.length, 3) * 1.22;
+  // こだわりを固定位置に置くため、代表案件エリアの高さからprojHを逆算
+  const KOD_LABEL_Y = 5.94;   // こだわりラベルのY位置（固定）
+  const KOD_H       = 0.9;    // こだわりカードの高さ（固定）
+  const PROJ_TOP    = 1.6;    // 代表案件カード開始Y
+  const PROJ_AREA_H = KOD_LABEL_Y - 0.1 - PROJ_TOP; // = 4.24 in
+  const numProjs    = Math.min(projs.length, 3) || 1;
+  const projH       = (PROJ_AREA_H - Math.max(0, numProjs - 1) * 0.08) / numProjs;
+
   slide.addText("代表案件", { x:RX, y:1.34, w:RW, h:0.2, fontSize:8, bold:true, color:C.slate, charSpacing:2 });
 
-  const projW   = RW - 1.7; // 左側（概要・役割等）
+  const projW   = RW - 1.7;
   const stackX  = RX + projW + 0.1;
   const stackW  = 1.6;
-  const projH   = 1.12;
 
   projs.slice(0, 3).forEach((p, i) => {
-    const py = 1.6 + i * (projH + 0.08);
+    const py = PROJ_TOP + i * (projH + 0.08);
 
     // カード背景
     slide.addShape(pptx.ShapeType.rect, { x:RX, y:py, w:RW, h:projH, fill:{color:C.white}, line:{color:C.border, width:0.75}, rectRadius:0.05 });
@@ -168,17 +174,15 @@ export function generatePptx(data: EngineerData): void {
     }
   });
 
-  // ③ こだわり（横3枚、下段）
-  const kodY = 1.6 + Math.min(projs.length, 3) * (projH + 0.08) + 0.1;
-  slide.addText("こだわり", { x:RX, y:kodY, w:RW, h:0.2, fontSize:8, bold:true, color:C.orange, charSpacing:2 });
+  // ③ こだわり（横3枚、固定位置・固定高さ）
+  slide.addText("こだわり", { x:RX, y:KOD_LABEL_Y, w:RW, h:0.2, fontSize:8, bold:true, color:C.orange, charSpacing:2 });
   const kCW = (RW - 0.16) / 3;
   for (let i = 0; i < 3; i++) {
     const cx = RX + i * (kCW + 0.08);
-    const kh = SH - kodY - 0.38 - 0.24;
-    slide.addShape(pptx.ShapeType.rect, { x:cx, y:kodY+0.24, w:kCW, h:kh, fill:{color:C.orangePale}, line:{color:C.orangeBorder, width:0.75}, rectRadius:0.05 });
-    slide.addShape(pptx.ShapeType.ellipse, { x:cx+0.1, y:kodY+0.32, w:0.19, h:0.19, fill:{color:C.orange}, line:{color:C.orange} });
-    slide.addText(String(i+1), { x:cx+0.1, y:kodY+0.32, w:0.19, h:0.19, fontSize:8, bold:true, color:C.white, align:"center", valign:"middle" });
-    slide.addText(kodawari[i] ?? "—", { x:cx+0.32, y:kodY+0.32, w:kCW-0.42, h:kh-0.14, fontSize:9.5, color:C.navy, fontFace:"Meiryo UI", wrap:true, valign:"top" });
+    slide.addShape(pptx.ShapeType.rect, { x:cx, y:KOD_LABEL_Y+0.24, w:kCW, h:KOD_H, fill:{color:C.orangePale}, line:{color:C.orangeBorder, width:0.75}, rectRadius:0.05 });
+    slide.addShape(pptx.ShapeType.ellipse, { x:cx+0.1, y:KOD_LABEL_Y+0.32, w:0.19, h:0.19, fill:{color:C.orange}, line:{color:C.orange} });
+    slide.addText(String(i+1), { x:cx+0.1, y:KOD_LABEL_Y+0.32, w:0.19, h:0.19, fontSize:8, bold:true, color:C.white, align:"center", valign:"middle" });
+    slide.addText(kodawari[i] ?? "—", { x:cx+0.32, y:KOD_LABEL_Y+0.32, w:kCW-0.42, h:KOD_H-0.1, fontSize:9.5, color:C.navy, fontFace:"Meiryo UI", wrap:true, valign:"top" });
   }
 
   // フッター
