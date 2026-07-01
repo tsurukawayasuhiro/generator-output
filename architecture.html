@@ -1,5 +1,5 @@
 
-<title>エンジニア名鑑ツール — アーキテクチャガイド</title>
+<title>プロフィール生成ツール — アーキテクチャガイド</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -469,8 +469,8 @@
 <!-- Sidebar -->
 <nav class="sidebar">
   <div class="sidebar-header">
-    <div class="sidebar-eyebrow">Atware Internal Tools</div>
-    <div class="sidebar-title">エンジニア名鑑<br>生成ツール</div>
+    <div class="sidebar-eyebrow">Architecture Guide</div>
+    <div class="sidebar-title">プロフィール<br>生成ツール</div>
     <div class="sidebar-sub">アーキテクチャガイド</div>
   </div>
   <div class="nav">
@@ -488,23 +488,25 @@
     <a href="#pptx-profile">PPTX: 詳細プロフィール</a>
     <a href="#pptx-card">PPTX: トレーディングカード</a>
     <a href="#page">page.tsx 入力フロー</a>
+    <div class="nav-section">セキュリティ</div>
+    <a href="#security">実装済みの対策</a>
     <div class="nav-section">注意点</div>
     <a href="#gotchas">pptxgenjs の落とし穴</a>
   </div>
-  <div class="sidebar-footer">v1.0 · 2026-07</div>
+  <div class="sidebar-footer">v1.1 · 2026-07</div>
 </nav>
 
 <!-- Main -->
 <main class="main">
 
   <!-- Page header -->
-  <h1 id="overview">エンジニア名鑑 生成ツール</h1>
-  <p class="page-sub">Google Sheets のデータを読み込み、トレーディングカード（PPTX）と詳細プロフィールスライド（PPTX）を自動生成する Next.js 製社内ツール。このドキュメントを読めば同等のシステムを再構築できる。</p>
+  <h1 id="overview">プロフィール生成ツール</h1>
+  <p class="page-sub">Google Sheets のデータを読み込み、トレーディングカード（PPTX）と詳細プロフィールスライド（PPTX）を自動生成する Next.js 製ツール。このドキュメントを読めば同等のシステムを再構築できる。</p>
 
   <!-- ── Overview ── -->
   <section class="section" id="overview-section">
     <h2>ツール概要</h2>
-    <p>営業・採用シーンで使えるエンジニア紹介資料を、スプレッドシートを編集せずにワンクリックで生成する。AI（GPT-4o）が紹介文を自動生成し、pptxgenjs がブラウザ内で PPTX を組み立てて直接ダウンロードする。</p>
+    <p>スプレッドシートを編集せずに、人物紹介資料をワンクリックで生成する。AI（GPT-4o）が紹介文を自動生成し、pptxgenjs がブラウザ内で PPTX を組み立てて直接ダウンロードする。</p>
 
     <h3>生成できる成果物</h3>
     <div class="stack-grid">
@@ -610,6 +612,7 @@
 ├── <span class="ft-file">page.tsx</span>                   <span class="ft-note">← メイン UI・入力フロー</span>
 └── <span class="ft-file">globals.css</span>
 
+<span class="ft-key">middleware.ts</span>                   <span class="ft-note">← API 認証ミドルウェア（全 /api/* に適用）</span>
 <span class="ft-file">.env.local</span>                     <span class="ft-note">← 環境変数（git 管理外）</span>
 <span class="ft-file">package.json</span>
 <span class="ft-file">tsconfig.json</span></div>
@@ -637,11 +640,21 @@
           <td class="desc">OpenAI API キー。紹介文生成（GPT-4o）に使用。</td>
           <td><span class="req">必須</span></td>
         </tr>
+        <tr>
+          <td class="key">INTERNAL_API_TOKEN</td>
+          <td class="desc">API ルートを保護する共有シークレット。ミドルウェアがリクエストヘッダーの <code>x-internal-token</code> と照合する。<br><code>openssl rand -hex 32</code> で生成。</td>
+          <td><span class="req">必須</span></td>
+        </tr>
+        <tr>
+          <td class="key">NEXT_PUBLIC_INTERNAL_API_TOKEN</td>
+          <td class="desc"><code>INTERNAL_API_TOKEN</code> と同じ値。クライアント側の <code>apiFetch()</code> がヘッダーに付与するために必要。<code>NEXT_PUBLIC_</code> プレフィックスにより JS バンドルに含まれる点に注意。</td>
+          <td><span class="req">必須</span></td>
+        </tr>
       </tbody>
     </table>
     <div class="callout warn" style="margin-top:14px">
       <span class="callout-icon">⚠️</span>
-      <span><code>NEXT_PUBLIC_</code> プレフィックスは付けない。両変数は API Route（サーバー側）からのみ参照され、クライアントには公開しない。</span>
+      <span><code>NEXT_PUBLIC_INTERNAL_API_TOKEN</code> はブラウザから参照可能。開発者ツールで確認できるため、ネットワークレベルのアクセス制御（VPN・Cloudflare Access 等）と組み合わせることを推奨。</span>
     </div>
   </section>
 
@@ -691,31 +704,37 @@
         <span class="code-lang">TypeScript</span>
       </div>
       <pre><span class="kw">import</span> { google } <span class="kw">from</span> <span class="str">"googleapis"</span>;
-<span class="kw">import</span> { NextRequest } <span class="kw">from</span> <span class="str">"next/server"</span>;
 
-<span class="kw">function</span> <span class="fn">getAuth</span>() {
+<span class="cm">// 認証インスタンスはモジュールスコープで1度だけ生成（毎リクエストで復号しない）</span>
+<span class="kw">const</span> auth = (() => {
   <span class="kw">const</span> b64 = process.env.<span class="prop">GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_B64</span>;
   <span class="kw">if</span> (!b64) <span class="kw">throw new</span> <span class="fn">Error</span>(<span class="str">"GOOGLE_SERVICE_ACCOUNT_CREDENTIALS_B64 is not set"</span>);
   <span class="kw">const</span> credentials = <span class="fn">JSON.parse</span>(Buffer.<span class="fn">from</span>(b64, <span class="str">"base64"</span>).<span class="fn">toString</span>(<span class="str">"utf-8"</span>));
   <span class="kw">return new</span> google.auth.<span class="fn">GoogleAuth</span>({
-    credentials,
-    scopes: [<span class="str">"https://www.googleapis.com/auth/spreadsheets.readonly"</span>],
+    credentials, scopes: [<span class="str">"https://www.googleapis.com/auth/spreadsheets.readonly"</span>],
   });
-}
+})();
+
+<span class="kw">const</span> SPREADSHEET_ID_RE = <span class="str">/^[a-zA-Z0-9_-]{20,60}$/</span>;
 
 <span class="kw">export async function</span> <span class="fn">POST</span>(request: <span class="typ">NextRequest</span>) {
   <span class="kw">const</span> { spreadsheetId, sheetName } = <span class="kw">await</span> request.<span class="fn">json</span>();
-  <span class="kw">const</span> sheets = google.<span class="fn">sheets</span>({ version: <span class="str">"v4"</span>, auth: <span class="fn">getAuth</span>() });
 
-  <span class="cm">// 常にシート名一覧を取得</span>
+  <span class="cm">// spreadsheetId のフォーマット検証</span>
+  <span class="kw">if</span> (!spreadsheetId || !SPREADSHEET_ID_RE.<span class="fn">test</span>(spreadsheetId))
+    <span class="kw">return</span> Response.<span class="fn">json</span>({ error: <span class="str">"Invalid spreadsheet ID"</span> }, { status: <span class="num">400</span> });
+
+  <span class="kw">const</span> sheets = google.<span class="fn">sheets</span>({ version: <span class="str">"v4"</span>, auth });
   <span class="kw">const</span> meta = <span class="kw">await</span> sheets.spreadsheets.<span class="fn">get</span>({ spreadsheetId });
   <span class="kw">const</span> sheetNames = meta.data.sheets
     ?.<span class="fn">map</span>((s) => s.properties?.title ?? <span class="str">""</span>).<span class="fn">filter</span>(Boolean) ?? [];
 
-  <span class="cm">// sheetName なし → シート名一覧のみ返す（ドロップダウン用）</span>
   <span class="kw">if</span> (!sheetName) <span class="kw">return</span> Response.<span class="fn">json</span>({ sheetNames, data: {} });
 
-  <span class="cm">// A:B 列を読み込んでキー/値マップに変換</span>
+  <span class="cm">// sheetName を取得済み一覧で検証（レンジインジェクション防止）</span>
+  <span class="kw">if</span> (!sheetNames.<span class="fn">includes</span>(sheetName))
+    <span class="kw">return</span> Response.<span class="fn">json</span>({ error: <span class="str">"Invalid sheet name"</span> }, { status: <span class="num">400</span> });
+
   <span class="kw">const</span> res = <span class="kw">await</span> sheets.spreadsheets.values.<span class="fn">get</span>({
     spreadsheetId, range: <span class="str">`'${sheetName}'!A:B`</span>,
   });
@@ -723,7 +742,6 @@
   <span class="kw">for</span> (<span class="kw">const</span> row <span class="kw">of</span> res.data.values ?? []) {
     <span class="kw">const</span> key = (row[<span class="num">0</span>] ?? <span class="str">""</span>).<span class="fn">trim</span>();
     <span class="kw">const</span> value = (row[<span class="num">1</span>] ?? <span class="str">""</span>).<span class="fn">trim</span>();
-    <span class="cm">// ## 始まりはセクション見出しなのでスキップ</span>
     <span class="kw">if</span> (key && !key.<span class="fn">startsWith</span>(<span class="str">"##"</span>)) data[key] = value;
   }
   <span class="kw">return</span> Response.<span class="fn">json</span>({ sheetNames, data });
@@ -744,28 +762,36 @@
       <pre><span class="kw">import</span> OpenAI <span class="kw">from</span> <span class="str">"openai"</span>;
 <span class="kw">const</span> client = <span class="kw">new</span> <span class="fn">OpenAI</span>({ apiKey: process.env.<span class="prop">OPENAI_API_KEY</span> });
 
+<span class="kw">function</span> <span class="fn">cap</span>(s: <span class="typ">string</span>, n = <span class="num">500</span>) { <span class="kw">return</span> s.<span class="fn">slice</span>(<span class="num">0</span>, n); }
+
 <span class="kw">export async function</span> <span class="fn">POST</span>(request: <span class="typ">NextRequest</span>) {
   <span class="kw">const</span> data = ((<span class="kw">await</span> request.<span class="fn">json</span>()).data) <span class="kw">as</span> Record&lt;<span class="typ">string</span>, <span class="typ">string</span>&gt;;
 
-  <span class="kw">const</span> prompt = <span class="str">`以下のエンジニア情報をもとに、営業・提案シーンで使える簡潔な紹介文を
-80〜100文字で生成してください。
+  <span class="cm">// 各フィールドを上限付きで取得（大量入力によるトークン浪費・インジェクション緩和）</span>
+  <span class="kw">const</span> name         = <span class="fn">cap</span>(data[<span class="str">"氏名"</span>] ?? <span class="str">""</span>, <span class="num">50</span>);
+  <span class="kw">const</span> engineerType = <span class="fn">cap</span>(data[<span class="str">"エンジニアタイプ"</span>] ?? <span class="str">""</span>);
+  <span class="kw">const</span> catchphrase  = <span class="fn">cap</span>(data[<span class="str">"キャッチフレーズ"</span>] ?? <span class="str">""</span>);
+  <span class="kw">const</span> reason       = <span class="fn">cap</span>(data[<span class="str">"エンジニアをやっている理由・原動力"</span>] ?? <span class="str">""</span>);
+  <span class="kw">const</span> episode      = <span class="fn">cap</span>(data[<span class="str">"自慢のエピソード"</span>] ?? <span class="str">""</span>);
 
-【制約】
-- 「${data["氏名"]}は〜」のような氏名主語の書き出しは禁止
-- 体言止めは使わず、自然な文体で
-- 80〜100文字に厳密に収めること
-- 紹介文のみを出力（見出し・説明不要）
-
-氏名: ${data["氏名"]}
-エンジニアタイプ: ${data["エンジニアタイプ"]}
-キャッチフレーズ: ${data["キャッチフレーズ"]}
-エンジニアをやっている理由: ${data["エンジニアをやっている理由・原動力"]}
-自慢のエピソード: ${data["自慢のエピソード"]}`</span>;
-
+  <span class="cm">// system/user ロール分離でプロンプトインジェクションを緩和</span>
+  <span class="cm">// データは user ロールの JSON として渡す</span>
   <span class="kw">const</span> response = <span class="kw">await</span> client.chat.completions.<span class="fn">create</span>({
     model: <span class="str">"gpt-4o"</span>,
-    messages: [{ role: <span class="str">"user"</span>, content: prompt }],
-    max_tokens: <span class="num">400</span>,
+    messages: [
+      {
+        role: <span class="str">"system"</span>,
+        content: [
+          <span class="str">"紹介文を生成するコピーライターです。"</span>,
+          <span class="str">`- 「${name}は〜」のような氏名主語の書き出しは禁止`</span>,
+          <span class="str">"- 体言止めは使わず、自然な文体で"</span>,
+          <span class="str">"- 80〜100文字に厳密に収めること"</span>,
+          <span class="str">"- 紹介文のみを出力（見出し・説明不要）"</span>,
+        ].<span class="fn">join</span>(<span class="str">"\n"</span>),
+      },
+      { role: <span class="str">"user"</span>, content: <span class="fn">JSON.stringify</span>({ name, engineerType, catchphrase, reason, episode }) },
+    ],
+    max_tokens: <span class="num">120</span>,  <span class="cm">// 80〜100字 ≒ 30〜40トークン。余裕を持たせつつ過剰生成を防ぐ</span>
   });
   <span class="kw">const</span> summary = response.choices[<span class="num">0</span>]?.message?.content?.<span class="fn">trim</span>() ?? <span class="str">""</span>;
   <span class="kw">return</span> Response.<span class="fn">json</span>({ summary });
@@ -905,41 +931,101 @@
         <span class="code-filename">app/page.tsx — フロー関数</span>
         <span class="code-lang">TypeScript</span>
       </div>
-      <pre><span class="cm">// Phase 1: シート名一覧を取得（sheetName を送らない）</span>
-<span class="kw">async function</span> <span class="fn">handleFetchSheets</span>() {
-  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">"/api/read-sheet"</span>, {
+      <pre><span class="cm">// 全 API 呼び出しを集約。x-internal-token ヘッダーを必ず付与する</span>
+<span class="kw">async function</span> <span class="fn">apiFetch</span>(path: <span class="typ">string</span>, body: <span class="typ">unknown</span>) {
+  <span class="kw">return</span> <span class="fn">fetch</span>(path, {
     method: <span class="str">"POST"</span>,
-    body: <span class="fn">JSON.stringify</span>({ spreadsheetId }),
+    headers: {
+      <span class="str">"Content-Type"</span>: <span class="str">"application/json"</span>,
+      <span class="str">"x-internal-token"</span>: process.env.<span class="prop">NEXT_PUBLIC_INTERNAL_API_TOKEN</span> ?? <span class="str">""</span>,
+    },
+    body: <span class="fn">JSON.stringify</span>(body),
   });
+}
+
+<span class="cm">// Phase 1: シート名一覧を取得（sheetName を送らない）</span>
+<span class="kw">async function</span> <span class="fn">handleFetchSheets</span>() {
+  <span class="kw">const</span> res = <span class="kw">await</span> <span class="fn">apiFetch</span>(<span class="str">"/api/read-sheet"</span>, { spreadsheetId });
   <span class="kw">const</span> { sheetNames } = <span class="kw">await</span> res.<span class="fn">json</span>();
   <span class="fn">setSheetNames</span>(sheetNames);
-  <span class="fn">setSheetName</span>(sheetNames[<span class="num">0</span>] ?? <span class="str">""</span>);  <span class="cm">// 先頭を初期選択</span>
+  <span class="fn">setSheetName</span>(sheetNames[<span class="num">0</span>] ?? <span class="str">""</span>);
 }
 
 <span class="cm">// Phase 2: データ読み込み → AI 要約生成</span>
 <span class="kw">async function</span> <span class="fn">handleLoad</span>() {
-  <span class="kw">const</span> { data } = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">"/api/read-sheet"</span>, {
-    body: <span class="fn">JSON.stringify</span>({ spreadsheetId, sheetName }),
-  }).<span class="fn">then</span>(r => r.<span class="fn">json</span>());
-
-  <span class="kw">const</span> { summary } = <span class="kw">await</span> <span class="fn">fetch</span>(<span class="str">"/api/summarize-card"</span>, {
-    body: <span class="fn">JSON.stringify</span>({ data }),
-  }).<span class="fn">then</span>(r => r.<span class="fn">json</span>());
-
+  <span class="kw">const</span> { data } = <span class="kw">await</span> (<span class="kw">await</span> <span class="fn">apiFetch</span>(<span class="str">"/api/read-sheet"</span>, { spreadsheetId, sheetName })).<span class="fn">json</span>();
+  <span class="kw">const</span> { summary } = <span class="kw">await</span> (<span class="kw">await</span> <span class="fn">apiFetch</span>(<span class="str">"/api/summarize-card"</span>, { data })).<span class="fn">json</span>();
   <span class="fn">setFields</span>({ name: data[<span class="str">"氏名"</span>], engineerType: data[<span class="str">"エンジニアタイプ"</span>],
-              catchphrase: data[<span class="str">"キャッチフレーズ"</span>], skills: data[<span class="str">"主戦場スキル"</span>],
-              summary, ... });
+              catchphrase: data[<span class="str">"キャッチフレーズ"</span>], skills: data[<span class="str">"主戦場スキル"</span>], summary, ... });
 }
 
-<span class="cm">// Phase 3: クライアントで PPTX 生成（サーバー不使用）</span>
+<span class="cm">// Phase 3: クライアントで PPTX 生成（サーバー不使用・dynamic import で遅延ロード）</span>
 <span class="kw">async function</span> <span class="fn">handleDownloadPptx</span>() {
-  <span class="kw">const</span> { generatePptx } = <span class="kw">await import</span>(<span class="str">"./lib/generatePptx"</span>);  <span class="cm">// 遅延ロード</span>
-  <span class="fn">generatePptx</span>(rawData);  <span class="cm">// ブラウザ内で .pptx を組み立ててダウンロード</span>
+  <span class="kw">const</span> { generatePptx } = <span class="kw">await import</span>(<span class="str">"./lib/generatePptx"</span>);
+  <span class="fn">generatePptx</span>(rawData);
 }
-
 <span class="kw">async function</span> <span class="fn">handleDownloadCard</span>() {
   <span class="kw">const</span> { generateCardPptx } = <span class="kw">await import</span>(<span class="str">"./lib/generatePptx"</span>);
   <span class="fn">generateCardPptx</span>(fields, theme);
+}</pre>
+    </div>
+  </section>
+
+  <!-- ── Security ── -->
+  <section class="section" id="security">
+    <h2>実装済みのセキュリティ対策</h2>
+    <p>以下の対策を実装済み。新規プロジェクトに流用する際も同様の構成を推奨する。</p>
+
+    <h3>ミドルウェア認証（middleware.ts）</h3>
+    <p>全 <code>/api/*</code> リクエストに対してトークン検証を行う。ルートごとに認証を書く必要がなく、追加した API Route に自動適用される。</p>
+    <div class="code-wrap">
+      <div class="code-header">
+        <span class="code-filename">middleware.ts</span>
+        <span class="code-lang">TypeScript</span>
+      </div>
+      <pre><span class="kw">import</span> { NextRequest, NextResponse } <span class="kw">from</span> <span class="str">"next/server"</span>;
+
+<span class="kw">export function</span> <span class="fn">middleware</span>(req: <span class="typ">NextRequest</span>) {
+  <span class="kw">const</span> token = req.headers.<span class="fn">get</span>(<span class="str">"x-internal-token"</span>);
+  <span class="kw">if</span> (token !== process.env.<span class="prop">INTERNAL_API_TOKEN</span>)
+    <span class="kw">return</span> NextResponse.<span class="fn">json</span>({ error: <span class="str">"Unauthorized"</span> }, { status: <span class="num">401</span> });
+  <span class="kw">return</span> NextResponse.<span class="fn">next</span>();
+}
+
+<span class="kw">export const</span> config = { matcher: [<span class="str">"/api/:path*"</span>] };</pre>
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <span><code>NEXT_PUBLIC_INTERNAL_API_TOKEN</code> はクライアントバンドルに含まれブラウザから確認できる。URLを知っている人であれば誰でも利用可能な点は変わらない。ネットワークレベルの制御（VPN・Cloudflare Access 等）と組み合わせることで完全に遮断できる。</span>
+    </div>
+
+    <h3>入力検証</h3>
+    <div class="gotcha-list">
+      <div class="gotcha-item" style="border-left-color: var(--blue)">
+        <div class="gotcha-title">spreadsheetId のフォーマット検証</div>
+        <div class="gotcha-body">Google Sheets ID は <code>/^[a-zA-Z0-9_-]{20,60}$/</code> で検証。不正な文字列で Google API を呼び出す前に弾く。</div>
+      </div>
+      <div class="gotcha-item" style="border-left-color: var(--blue)">
+        <div class="gotcha-title">sheetName のホワイトリスト検証</div>
+        <div class="gotcha-body">シート名は <code>spreadsheets.get</code> で取得した一覧との完全一致で検証する。<code>'foo'!A1:ZZZ</code> のようなレンジインジェクションを防止。</div>
+      </div>
+      <div class="gotcha-item" style="border-left-color: var(--blue)">
+        <div class="gotcha-title">プロンプトへの入力上限</div>
+        <div class="gotcha-body">各フィールドを最大 500 字で切り詰める <code>cap()</code> 関数を適用。GPT-4o への過剰トークン送信とインジェクション文字列の規模を制限。</div>
+      </div>
+    </div>
+
+    <h3>エラーハンドリング</h3>
+    <p>API Route の catch ブロックはエラーをサーバーログにのみ出力し、クライアントには汎用メッセージを返す。Google API / OpenAI SDK のエラーメッセージにはサービスアカウント情報等が含まれる場合があるため、そのまま返却しない。</p>
+    <div class="code-wrap">
+      <div class="code-header">
+        <span class="code-filename">エラーハンドリングパターン</span>
+        <span class="code-lang">TypeScript</span>
+      </div>
+      <pre>} <span class="kw">catch</span> (err) {
+  console.<span class="fn">error</span>(<span class="str">"[route-name]"</span>, err);  <span class="cm">// サーバーログのみ</span>
+  <span class="kw">return</span> Response.<span class="fn">json</span>({ error: <span class="str">"処理に失敗しました"</span> }, { status: <span class="num">500</span> });
 }</pre>
     </div>
   </section>
