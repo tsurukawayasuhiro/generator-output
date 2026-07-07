@@ -374,16 +374,22 @@ export function generateCardPptx(
   });
   BY += 0.12;
 
-  // 紹介文
+  // 紹介文（実際の行数で高さを計算し、空白を残さない）
   if (fields.summary) {
-    const sumBottom = CY + CH - (fields.skills ? 0.9 : 0.18);
-    const sumH = Math.max(0.3, sumBottom - BY);
+    const sumCharW = (10.5 * 0.58) / 72;
+    const sumCPL = Math.max(1, Math.floor(BW / sumCharW));
+    const sumLineH = (10.5 / 72) * 1.75 * 1.15;
+    const sumMaxBottom = CY + CH - (fields.skills ? 0.9 : 0.18);
+    const sumMaxH = sumMaxBottom - BY;
+    const sumMaxLines = Math.max(1, Math.floor(sumMaxH / sumLineH));
+    const sumLines = Math.min(Math.ceil(fields.summary.length / sumCPL), sumMaxLines);
+    const sumH = Math.min(sumLines * sumLineH + 0.06, sumMaxH);
     slide.addText(fitText(fields.summary, BW, sumH, 10.5, 1.75), {
       x: BX, y: BY, w: BW, h: sumH,
       fontSize: 10.5, color: "444444", fontFace: "Meiryo UI", wrap: true, lineSpacingMultiple: 1.75,
       valign: "top", margin: 0,
     });
-    BY += sumH + 0.08;
+    BY += sumH + 0.1;
   }
 
   // スキル
