@@ -42,7 +42,12 @@ export async function POST(request: NextRequest) {
       max_tokens: 160,
     });
 
-    const summary = response.choices[0]?.message?.content?.trim() ?? "";
+    let summary = response.choices[0]?.message?.content?.trim() ?? "";
+    if (summary.length > 100) {
+      const cut = summary.slice(0, 100);
+      const last = cut.lastIndexOf("。");
+      summary = last > 0 ? cut.slice(0, last + 1) : cut;
+    }
     return Response.json({ summary });
   } catch (err) {
     console.error("[summarize-card]", err);
