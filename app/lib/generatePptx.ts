@@ -342,11 +342,17 @@ export function generateCardPptx(
   // エンジニアタイプ
   if (fields.engineerType) {
     const typeText = fields.engineerType.split(/[,、]/).map((s) => s.trim()).filter(Boolean).join(" / ");
-    slide.addText(typeText, {
-      x: BX, y: BY, w: BW, h: 0.2,
-      fontSize: 10, color: C.muted, fontFace: "Meiryo UI",
+    const typeCharW = (10 * 0.58) / 72;
+    const typeCPL = Math.max(1, Math.floor(BW / typeCharW));
+    const typeLines = Math.min(Math.ceil(typeText.length / typeCPL), 3);
+    const typeLineH = (10 / 72) * 1.3 * 1.15;
+    const typeH = typeLines * typeLineH + 0.04;
+    slide.addText(fitText(typeText, BW, typeH, 10, 1.3), {
+      x: BX, y: BY, w: BW, h: typeH,
+      fontSize: 10, color: C.muted, fontFace: "Meiryo UI", wrap: true,
+      valign: "top", margin: 0,
     });
-    BY += 0.24;
+    BY += typeH + 0.06;
   }
 
   // キャッチフレーズ
