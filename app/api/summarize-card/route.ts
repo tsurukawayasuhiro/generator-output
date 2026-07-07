@@ -29,7 +29,8 @@ export async function POST(request: NextRequest) {
             "【制約】",
             `- 「${name}は〜」のように氏名を主語にした書き出しは禁止。`,
             "- 体言止めは使わず、自然な文体で。",
-            "- 80〜100文字に厳密に収めること。",
+            "- 必ず100文字以内（日本語）で完結した文にすること。80〜100文字が理想。",
+            "- 文は必ず句点（。）で終わること。",
             "- 紹介文のみを出力（見出し・説明不要）。",
           ].join("\n"),
         },
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
           content: JSON.stringify({ name, engineerType, catchphrase, reason, episode }),
         },
       ],
-      max_tokens: 120,
+      max_tokens: 160,
     });
 
     const summary = response.choices[0]?.message?.content?.trim() ?? "";
