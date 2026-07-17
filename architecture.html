@@ -791,9 +791,15 @@
       },
       { role: <span class="str">"user"</span>, content: <span class="fn">JSON.stringify</span>({ name, engineerType, catchphrase, reason, episode }) },
     ],
-    max_tokens: <span class="num">120</span>,  <span class="cm">// 80〜100字 ≒ 30〜40トークン。余裕を持たせつつ過剰生成を防ぐ</span>
+    max_tokens: <span class="num">160</span>,  <span class="cm">// 余裕を持たせて過剰生成を防ぐ（JS側でさらに切り詰める）</span>
   });
-  <span class="kw">const</span> summary = response.choices[<span class="num">0</span>]?.message?.content?.<span class="fn">trim</span>() ?? <span class="str">""</span>;
+  <span class="kw">let</span> summary = response.choices[<span class="num">0</span>]?.message?.content?.<span class="fn">trim</span>() ?? <span class="str">""</span>;
+  <span class="cm">// GPT は制約を守らないことがある — 100字以内の最後の句点で必ず打ち切る</span>
+  <span class="kw">if</span> (summary.length > <span class="num">100</span>) {
+    <span class="kw">const</span> cut = summary.<span class="fn">slice</span>(<span class="num">0</span>, <span class="num">100</span>);
+    <span class="kw">const</span> last = cut.<span class="fn">lastIndexOf</span>(<span class="str">"。"</span>);
+    summary = last > <span class="num">0</span> ? cut.<span class="fn">slice</span>(<span class="num">0</span>, last + <span class="num">1</span>) : cut;
+  }
   <span class="kw">return</span> Response.<span class="fn">json</span>({ summary });
 }</pre>
     </div>
